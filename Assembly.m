@@ -36,14 +36,14 @@
   return line;
 }
 
--(CLString *) lineWithLabel:(CLDictionary *) labels origin:(CLUInteger) origin
+-(CLString *) lineWithLabel:(CLDictionary *) labels
 {
   CLNumber *num;
   CLString *label;
 
 
-  num = [CLNumber numberWithUnsignedInt:value - origin];
-  label =[labels objectForKey:num];
+  num = [CLNumber numberWithUnsignedInt:value];
+  label = [labels objectForKey:num];
   if (!label)
     label = [CLString stringWithFormat:@"$%04X", value];
 

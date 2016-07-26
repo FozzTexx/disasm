@@ -20,7 +20,7 @@
 -(void) dealloc;
 
 -(CLString *) line;
--(CLString *) lineWithLabel:(CLDictionary *) labels origin:(CLUInteger) origin;
+-(CLString *) lineWithLabel:(CLDictionary *) labels;
 -(CLUInteger) value;
 -(CLUInteger) length;
 -(BOOL) isEntryPoint;

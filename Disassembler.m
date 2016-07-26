@@ -6,6 +6,7 @@
 
 #import "Disassembler.h"
 #import "Assembly.h"
+#import "AppleLabels.h"
 
 typedef struct {
   int length;
@@ -24,6 +25,9 @@ typedef struct {
 
 -(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org entry:(CLUInteger) ent
 {
+  int i;
+
+  
   [super init];
   binary = [aData retain];
   origin = org;
@@ -31,6 +35,11 @@ typedef struct {
   stack = [[CLMutableArray alloc] init];
   assembly = [[CLMutableDictionary alloc] init];
   labels = [[CLMutableDictionary alloc] init];
+
+  for (i = 0; appleSubs[i].label; i++)
+    [labels setObject:appleSubs[i].label
+	       forKey:[CLNumber numberWithUnsignedInt:appleSubs[i].address]];
+  
   return self;
 }
 
@@ -49,33 +58,6 @@ typedef struct {
   CLNumber *num;
   
 
-  if (address == 0xFC58) /* HOME */
-    return;
-
-  if (address == 0xFC9C) /* Clear to end of line */
-    return;
-  
-  if (address == 0xFDF0) /* Write byte in A-reg to screen */
-    return;
-
-  if (address == 0xFD0C) /* Read character from keyboard */
-    return;
-
-  if (address == 0xFB5B) /* Place cursor at line */
-    return;
-
-  if (address == 0xFDED) /* Print byte in A-reg to device */
-    return;
-  
-  if (address == 0x03D6) /* DOS 3.1/3.2 I/O package entry point */
-    return;
-
-  if (address == 0x3DC) /* DOS 3.1/3.2 Sys Buffer */
-    return;
-
-  if (address == 0xA060) /* DOS??? */
-    return;
-  
   num = [CLNumber numberWithUnsignedInt:address];
   if (address < origin || address >= [binary length] + origin) {
     if (![labels objectForKey:num])
@@ -127,7 +109,7 @@ typedef struct {
   for (i = 0; i < len; i++) {
     if (i)
       [mString appendString:@","];
-    [mString appendFormat:@" $%02X", [self valueAt:address length:1]];
+    [mString appendFormat:@" $%02X", [self valueAt:address + i length:1]];
   }
   [self addAssembly:mString value:0 length:len entryPoint:NO at:address];
 
@@ -148,6 +130,16 @@ typedef struct {
   return len * 2;
 }
 
+-(void) addLabel:(CLString *) aString at:(CLUInteger) address
+{
+  CLNumber *num = [CLNumber numberWithUnsignedInt:address];
+
+
+  if (![labels objectForKey:num])
+    [labels setObject:aString forKey:num];
+  return;
+}
+
 -(void) disassembleFrom:(CLUInteger) start
 {
   CLUInteger progCounter, val, instr, len;
@@ -156,8 +148,7 @@ typedef struct {
 
 
   progCounter = start;
-  [labels setObject:[CLString stringWithFormat:@"L%04X", progCounter]
-	     forKey:[CLNumber numberWithUnsignedInt:progCounter]];
+  [self addLabel:[CLString stringWithFormat:@"L%04X", progCounter] at:progCounter];
   
   for (;;) {
     if (progCounter < origin || progCounter >= [binary length] + origin)
@@ -180,16 +171,21 @@ typedef struct {
 	val = ((int8_t) val) + progCounter + oc->length;
 	/* Fall-through intentional */
       case 0:
-	if (val >= origin && val < [binary length] + origin) {
+	{
 	  CLString *label;
+	  CLNumber *num;
 
-	  
-	  label = [CLString stringWithFormat:@"L%04X", val];
-	  [mString appendString:@" %@"]; /* Will write the label on output */
-	  [labels setObject:label forKey:[CLNumber numberWithUnsignedInt:val]];
+
+	  num = [CLNumber numberWithUnsignedInt:val];
+	  if ((val >= origin && val < [binary length] + origin) ||
+	      [labels objectForKey:num]) {
+	    label = [CLString stringWithFormat:@"L%04X", val];
+	    [mString appendString:@" %@"]; /* Will write the label on output */
+	    [self addLabel:label at:val];
+	  }
+	  else 
+	    [mString appendFormat:@" $%0*X", len * 2, val];
 	}
-	else 
-	  [mString appendFormat:@" $%0*X", len * 2, val];
 	break;
       case '#':
 	[mString appendFormat:@" #$%0*X", len * 2, val];
@@ -247,7 +243,7 @@ typedef struct {
 	    int addrCount;
 
 
-	    addrCount = [self valueAt:progCounter length:1];
+	    addrCount = [self valueAt:progCounter length:1] * 2;
 	    
 	    progCounter += [self declareBytes:4 at:progCounter];
 
@@ -310,8 +306,7 @@ typedef struct {
   
   mString = [[CLMutableString alloc] init];
 
-  [labels setObject:[CLString stringWithFormat:@"L%04X", start]
-	     forKey:[CLNumber numberWithUnsignedInt:start]];
+  [self addLabel:[CLString stringWithFormat:@"L%04X", start] at:start];
   
   for (i = 0; i < len; ) {
     for (si = i; si < len; si++) {
@@ -442,7 +437,7 @@ typedef struct {
   }
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
-  for (i = progCounter = 0, j = [anArray count]; i < j; i++) {
+  for (i = 0, progCounter = origin, j = [anArray count]; i < j; i++) {
     num = [anArray objectAtIndex:i];
     asmObj = [assembly objectForKey:num];
     if ([num unsignedIntValue] - progCounter)
@@ -451,17 +446,22 @@ typedef struct {
   }
 
   if ([binary length] - progCounter)
-    [self declareDataFrom:progCounter to:[binary length]];
+    [self declareDataFrom:progCounter to:[binary length] + origin];
 
-  anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   printf("          ORG $%04X\n", origin);
+
+  for (i = 0; appleSubs[i].label; i++)
+    printf("%-10sEQU $%04X\n",
+	   [appleSubs[i].label UTF8String], appleSubs[i].address);
+  
+  anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
     asmObj = [assembly objectForKey:[anArray objectAtIndex:i]];
     if (i && [asmObj isEntryPoint])
       printf("\n");
     label = [[labels objectForKey:[anArray objectAtIndex:i]] stringByAppendingString:@":"];
     printf("%-10s%s\n", label ? [label UTF8String] : "",
-	   [[asmObj lineWithLabel:labels origin:origin] UTF8String]);
+	   [[asmObj lineWithLabel:labels] UTF8String]);
   }
   
   return;
