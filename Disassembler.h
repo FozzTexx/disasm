@@ -6,6 +6,8 @@
 
 #import <ClearLake/ClearLake.h>
 
+#define LABEL_COL	"-8"
+
 @interface Disassembler:CLObject
 {
   CLUInteger origin, entry;
@@ -20,5 +22,7 @@
 -(void) dealloc;
 
 -(void) disassemble;
+
+-(void) addLabels:(CLString *) aString;
 
 @end

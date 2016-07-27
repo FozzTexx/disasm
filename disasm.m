@@ -4,6 +4,7 @@
  * $Id$
  */
 
+#import "disasm.h"
 #import "Disassembler.h"
 
 CLUInteger parseUnsigned(CLString *aString)
@@ -19,7 +20,7 @@ CLUInteger parseUnsigned(CLString *aString)
 int main(int argc, char *argv[])
 {
   int count;
-  CLString *org = nil, *ent = nil;
+  CLString *org = nil, *ent = nil, *labels = nil;
   CLUInteger origin = 0, entry = 0;
   CLData *aData;
   Disassembler *disasm;
@@ -28,7 +29,7 @@ int main(int argc, char *argv[])
 
   pool = [[CLAutoreleasePool alloc] init];
 
-  count = CLGetArgs(argc, argv, @"os", &org);
+  count = CLGetArgs(argc, argv, @"osesls", &org, &ent, &labels);
 
   if (count < 0 || (argc - count) != 1) {
     if (count < 0 && -count != '-')
@@ -51,6 +52,7 @@ int main(int argc, char *argv[])
   aData = [CLData dataWithContentsOfFile:[CLString stringWithUTF8String:argv[count]]];
 
   disasm = [[Disassembler alloc] initWithBinary:aData origin:origin entry:entry];
+  [disasm addLabels:labels];
   [disasm disassemble];
   [disasm release];
 

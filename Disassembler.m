@@ -7,6 +7,7 @@
 #import "Disassembler.h"
 #import "Assembly.h"
 #import "AppleLabels.h"
+#import "disasm.h"
 
 typedef struct {
   int length;
@@ -78,7 +79,7 @@ typedef struct {
   Assembly *asmObj;
 
 
-  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:NO];
+  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:flag];
   [assembly setObject:asmObj forKey:[CLNumber numberWithUnsignedInt:address]];
   [asmObj release];
 }
@@ -145,6 +146,7 @@ typedef struct {
   CLUInteger progCounter, val, instr, len;
   opcode *oc;
   CLMutableString *mString;
+  CLString *label, *placeHolder;
 
 
   progCounter = start;
@@ -166,51 +168,61 @@ typedef struct {
 
     len = oc->length - 1;
     if (len) {
+      if (oc->type == 'B') {
+	val = ((int8_t) val) + progCounter + oc->length;
+	len = 2;
+      }
+	
+      if (len == 2) {
+	CLNumber *num;
+
+
+	num = [CLNumber numberWithUnsignedInt:val];
+	if ((val >= origin && val < [binary length] + origin) ||
+	    [labels objectForKey:num]) {
+	  label = [CLString stringWithFormat:@"L%04X", val];
+	  placeHolder = @"%@";
+	  [self addLabel:label at:val];
+	}
+	else  {
+	  label = nil;
+	  placeHolder = [CLString stringWithFormat:@"$%04X", val];
+	}
+      }
+      else {
+	label = nil;
+	placeHolder = [CLString stringWithFormat:@"$%02X", val];
+      }
+      
       switch (oc->type) {
       case 'B':
-	val = ((int8_t) val) + progCounter + oc->length;
-	/* Fall-through intentional */
       case 0:
-	{
-	  CLString *label;
-	  CLNumber *num;
-
-
-	  num = [CLNumber numberWithUnsignedInt:val];
-	  if ((val >= origin && val < [binary length] + origin) ||
-	      [labels objectForKey:num]) {
-	    label = [CLString stringWithFormat:@"L%04X", val];
-	    [mString appendString:@" %@"]; /* Will write the label on output */
-	    [self addLabel:label at:val];
-	  }
-	  else 
-	    [mString appendFormat:@" $%0*X", len * 2, val];
-	}
+	[mString appendFormat:@" %@", placeHolder];
 	break;
       case '#':
-	[mString appendFormat:@" #$%0*X", len * 2, val];
+	[mString appendFormat:@" #%@", placeHolder];
 	break;
       case '-':
-	[mString appendFormat:@" ($%0*X),Y", len * 2, val];
+	[mString appendFormat:@" (%@),Y", placeHolder];
 	break;
       case '+':
-	[mString appendFormat:@" ($%0*X,X)", len * 2, val];
+	[mString appendFormat:@" (%@,X)", placeHolder];
 	break;
       case '(':
-	[mString appendFormat:@" ($%0*X)", len * 2, val];
+	[mString appendFormat:@" (%@)", placeHolder];
 	break;
       case '[':
-	[mString appendFormat:@" [$%0*X]", len * 2, val];
+	[mString appendFormat:@" [%@]", placeHolder];
 	break;
       case 'X':
       case 'Y':
-	[mString appendFormat:@" $%0*X,%c", len * 2, val, oc->type];
+	[mString appendFormat:@" %@,%c", placeHolder, oc->type];
 	break;
       case 's':
-	[mString appendFormat:@" ($%0*X,S)", len * 2, val];
+	[mString appendFormat:@" (,S)", placeHolder];
 	break;
       case 'y':
-	[mString appendFormat:@" [$%0*X],Y", len * 2, val];
+	[mString appendFormat:@" [%@],Y", placeHolder];
 	break;
       default:
 	[self error:@"Unknown mnemonic type %c", oc->type];
@@ -448,11 +460,13 @@ typedef struct {
   if ([binary length] - progCounter)
     [self declareDataFrom:progCounter to:[binary length] + origin];
 
-  printf("          ORG $%04X\n", origin);
+  printf("%" LABEL_COL "sORG $%04X\n", " ", origin);
+  printf("\n");
 
   for (i = 0; appleSubs[i].label; i++)
-    printf("%-10sEQU $%04X\n",
+    printf("%" LABEL_COL "sEQU $%04X\n",
 	   [appleSubs[i].label UTF8String], appleSubs[i].address);
+  printf("\n");
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
@@ -460,10 +474,26 @@ typedef struct {
     if (i && [asmObj isEntryPoint])
       printf("\n");
     label = [[labels objectForKey:[anArray objectAtIndex:i]] stringByAppendingString:@":"];
-    printf("%-10s%s\n", label ? [label UTF8String] : "",
+    printf("%" LABEL_COL "s%s\n", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels] UTF8String]);
   }
   
+  return;
+}
+
+-(void) addLabels:(CLString *) aString
+{
+  CLArray *anArray, *label;
+  int i, j;
+
+
+  anArray = [aString componentsSeparatedByString:@","];
+  for (i = 0, j = [anArray count]; i < j; i++) {
+    label = [[anArray objectAtIndex:i] componentsSeparatedByString:@"="];
+    [self addLabel:[[label objectAtIndex:1] stringByTrimmingWhitespaceAndNewlines]
+		at:parseUnsigned([label objectAtIndex:0])];
+  }
+
   return;
 }
 
