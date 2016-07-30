@@ -5,6 +5,7 @@
  */
 
 #import <ClearLake/ClearLake.h>
+#import "opcodes.h"
 
 @class Disassembler;
 
@@ -14,11 +15,12 @@
   BOOL entryPoint;
   CLString *line;
   CLUInteger value;
+  OpcodeType type;
 }
 
 -(id) init;
 -(id) initFromString:(CLString *) aString value:(CLUInteger) addr
-	      length:(int) aValue entryPoint:(BOOL) flag;
+	      length:(int) aValue entryPoint:(BOOL) flag type:(OpcodeType) aType;
 -(void) dealloc;
 
 -(CLString *) line;

@@ -68,12 +68,13 @@
 
 -(void) addAssembly:(CLString *) line value:(CLUInteger) target
 	     length:(CLUInteger) len entryPoint:(BOOL) flag
-		 at:(CLUInteger) address
+		 at:(CLUInteger) address type:(OpcodeType) type
 {
   Assembly *asmObj;
 
 
-  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:flag];
+  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:flag
+				       type:type];
   [assembly setObject:asmObj forKey:[CLNumber numberWithUnsignedInt:address]];
   [asmObj release];
 }
@@ -107,7 +108,7 @@
     [mString appendFormat:@" %@",
 	  [self formatHex:[self valueAt:address + i length:1] length:2]];
   }
-  [self addAssembly:mString value:0 length:len entryPoint:NO at:address];
+  [self addAssembly:mString value:0 length:len entryPoint:NO at:address type:0];
 
   return len;
 }
@@ -120,7 +121,7 @@
 
   for (i = 0; i < len; i++) {
     val = [self valueAt:address length:2];
-    [self addAssembly:@"adr %@" value:val length:len * 2 entryPoint:NO at:address];
+    [self addAssembly:@"adr %@" value:val length:len * 2 entryPoint:NO at:address type:0];
   }
 
   return len * 2;
@@ -162,7 +163,7 @@
     len = oc->length - 1;
     label = nil;
     
-    if (len) {
+    if (len && !(oc->type & OpcodeImmediate)) {
       if (oc->type & OpcodeRelative) {
 	val = ((int8_t) val) + progCounter + oc->length;
 	len = 2;
@@ -183,7 +184,7 @@
 
     if (![assembly objectForKey:[CLNumber numberWithUnsignedInt:progCounter]])
       [self addAssembly:oc->mnem value:val length:oc->length entryPoint:progCounter == start
-		     at:progCounter];
+		     at:progCounter type:oc->type];
 
     progCounter += oc->length;
     
@@ -287,13 +288,13 @@
 	      [self formatHex:[self valueAt:start + j length:1] length:2]];
 	if (b == 9) {
 	  [self addAssembly:mString value:0 length:b + 1 entryPoint:NO
-			 at:start + j - b];
+			 at:start + j - b type:0];
 	  b = -1;
 	  [mString setString:@"byt"];
 	}
       }
       if (b)
-	[self addAssembly:mString value:0 length:b entryPoint:NO at:start + j - b];
+	[self addAssembly:mString value:0 length:b entryPoint:NO at:start + j - b type:0];
     }
 
     i = si;
@@ -313,7 +314,7 @@
 	[mString appendFormat:@"%c", val];
       }
       [mString appendString:@"\""];
-      [self addAssembly:mString value:0 length:si - i entryPoint:NO at:start + i];
+      [self addAssembly:mString value:0 length:si - i entryPoint:NO at:start + i type:0];
     }
 
     i = si;
@@ -451,8 +452,11 @@
 
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len
 {
-  //  return [CLString stringWithFormat:@"$%0*X", len, aValue];
+#if CSTYLE
   return [CLString stringWithFormat:@"0x%0*X", len, aValue];
+#else
+  return [CLString stringWithFormat:@"$%0*X", len, aValue];
+#endif
 }
 
 @end

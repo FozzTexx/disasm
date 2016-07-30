@@ -11,17 +11,18 @@
 
 -(id) init
 {
-  return [self initFromString:nil value:0 length:0 entryPoint:NO];
+  return [self initFromString:nil value:0 length:0 entryPoint:NO type:0];
 }
 
 -(id) initFromString:(CLString *) aString value:(CLUInteger) aValue
-	      length:(int) aLength entryPoint:(BOOL) flag
+	      length:(int) aLength entryPoint:(BOOL) flag type:(OpcodeType) aType;
 {
   [super init];
   line = [aString copy];
   len = aLength;
   entryPoint = flag;
   value = aValue;
+  type = aType;
   return self;
 }
 
@@ -43,7 +44,7 @@
   CLString *label = nil;
 
 
-  if (len > 1) {
+  if (len > 1 && !(type & OpcodeImmediate)) {
     num = [CLNumber numberWithUnsignedInt:value];
     label = [labels objectForKey:num];
     if (!label)

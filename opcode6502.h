@@ -4,25 +4,7 @@
  * $Id$
  */
 
-#define CSTYLE 1
-
-typedef enum {
-  OpcodeRelative =	0x01,
-  OpcodeImmediate =	0x02,
-  OpcodeIndirect =	0x04,
-  OpcodeBranch =	0x08,
-  OpcodeCall =		0x10,
-  OpcodeJump =		0x20,
-  OpcodeReturn =	0x40,
-  Opcode65c02 =		0x80,
-} opcodeType;
-
-typedef struct {
-  int code;
-  int length;
-  CLString *mnem;
-  opcodeType type;
-} opcode;
+#import "opcodes.h"
 
 #if CSTYLE
 opcode opcodes[] = {
