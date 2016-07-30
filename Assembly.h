@@ -6,6 +6,8 @@
 
 #import <ClearLake/ClearLake.h>
 
+@class Disassembler;
+
 @interface Assembly:CLObject
 {
   CLUInteger len;
@@ -20,7 +22,7 @@
 -(void) dealloc;
 
 -(CLString *) line;
--(CLString *) lineWithLabel:(CLDictionary *) labels;
+-(CLString *) lineWithLabel:(CLDictionary *) labels disassembler:(Disassembler *) disasm;
 -(CLUInteger) value;
 -(CLUInteger) length;
 -(BOOL) isEntryPoint;

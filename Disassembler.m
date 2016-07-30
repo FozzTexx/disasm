@@ -104,7 +104,8 @@
   for (i = 0; i < len; i++) {
     if (i)
       [mString appendString:@","];
-    [mString appendFormat:@" $%02X", [self valueAt:address + i length:1]];
+    [mString appendFormat:@" %@",
+	  [self formatHex:[self valueAt:address + i length:1] length:2]];
   }
   [self addAssembly:mString value:0 length:len entryPoint:NO at:address];
 
@@ -282,7 +283,8 @@
       for (j = i, b = 0; j < si; j++, b++) {
 	if (b)
 	  [mString appendString:@","];
-	[mString appendFormat:@" $%02X", [self valueAt:start + j length:1]];
+	[mString appendFormat:@" %@",
+	      [self formatHex:[self valueAt:start + j length:1] length:2]];
 	if (b == 9) {
 	  [self addAssembly:mString value:0 length:b + 1 entryPoint:NO
 			 at:start + j - b];
@@ -410,12 +412,12 @@
   if ([binary length] - progCounter)
     [self declareDataFrom:progCounter to:[binary length] + origin];
 
-  printf("\tORG $%04X\n", origin);
+  printf("\tORG %s\n", [[self formatHex:origin length:4] UTF8String]);
   printf("\n");
 
   for (i = 0; appleSubs[i].label; i++)
-    printf("%s\tEQU $%04X\n",
-	   [appleSubs[i].label UTF8String], appleSubs[i].address);
+    printf("%s\tEQU %s\n", [appleSubs[i].label UTF8String],
+	   [[self formatHex:appleSubs[i].address length:4] UTF8String]);
   printf("\n");
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
@@ -425,7 +427,7 @@
       printf("\n");
     label = [[labels objectForKey:[anArray objectAtIndex:i]] stringByAppendingString:@":"];
     printf("%s\t%s\n", label ? [label UTF8String] : "",
-	   [[asmObj lineWithLabel:labels] UTF8String]);
+	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
   }
   
   return;
@@ -445,6 +447,12 @@
   }
 
   return;
+}
+
+-(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len
+{
+  //  return [CLString stringWithFormat:@"$%0*X", len, aValue];
+  return [CLString stringWithFormat:@"0x%0*X", len, aValue];
 }
 
 @end

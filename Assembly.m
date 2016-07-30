@@ -5,6 +5,7 @@
  */
 
 #import "Assembly.h"
+#import "Disassembler.h"
 
 @implementation Assembly
 
@@ -36,7 +37,7 @@
   return line;
 }
 
--(CLString *) lineWithLabel:(CLDictionary *) labels
+-(CLString *) lineWithLabel:(CLDictionary *) labels disassembler:(Disassembler *) disasm
 {
   CLNumber *num;
   CLString *label = nil;
@@ -46,7 +47,7 @@
     num = [CLNumber numberWithUnsignedInt:value];
     label = [labels objectForKey:num];
     if (!label)
-      label = [CLString stringWithFormat:@"$%0*X", (len - 1) * 2, value];
+      label = [disasm formatHex:value length:(len - 1) * 2];
   }
 
   if (label)

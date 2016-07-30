@@ -23,4 +23,6 @@
 
 -(void) addLabels:(CLString *) aString;
 
+-(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len;
+
 @end
