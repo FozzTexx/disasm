@@ -39,15 +39,20 @@
 -(CLString *) lineWithLabel:(CLDictionary *) labels
 {
   CLNumber *num;
-  CLString *label;
+  CLString *label = nil;
 
 
-  num = [CLNumber numberWithUnsignedInt:value];
-  label = [labels objectForKey:num];
-  if (!label)
-    label = [CLString stringWithFormat:@"$%04X", value];
+  if (len > 1) {
+    num = [CLNumber numberWithUnsignedInt:value];
+    label = [labels objectForKey:num];
+    if (!label)
+      label = [CLString stringWithFormat:@"$%0*X", (len - 1) * 2, value];
+  }
 
-  return [CLString stringWithFormat:line, label];
+  if (label)
+    return [CLString stringWithFormat:line, label];
+
+  return line;
 }
 
 -(CLUInteger) length

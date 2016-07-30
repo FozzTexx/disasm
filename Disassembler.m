@@ -9,12 +9,6 @@
 #import "AppleLabels.h"
 #import "disasm.h"
 
-typedef struct {
-  int length;
-  CLString *mnem;
-  int type;
-} opcode;
-
 #import "opcode6502.h"
 
 @implementation Disassembler
@@ -145,8 +139,7 @@ typedef struct {
 {
   CLUInteger progCounter, val, instr, len;
   opcode *oc;
-  CLMutableString *mString;
-  CLString *label, *placeHolder;
+  CLString *label;
 
 
   progCounter = start;
@@ -164,11 +157,12 @@ typedef struct {
 
     if (oc->length - 1)
       val = [self valueAt:progCounter + 1 length:oc->length - 1];
-    mString = [CLMutableString stringWithFormat:@"%@", oc->mnem];
 
     len = oc->length - 1;
+    label = nil;
+    
     if (len) {
-      if (oc->type == 'B') {
+      if (oc->type & OpcodeRelative) {
 	val = ((int8_t) val) + progCounter + oc->length;
 	len = 2;
       }
@@ -181,66 +175,22 @@ typedef struct {
 	if ((val >= origin && val < [binary length] + origin) ||
 	    [labels objectForKey:num]) {
 	  label = [CLString stringWithFormat:@"L%04X", val];
-	  placeHolder = @"%@";
 	  [self addLabel:label at:val];
 	}
-	else  {
-	  label = nil;
-	  placeHolder = [CLString stringWithFormat:@"$%04X", val];
-	}
-      }
-      else {
-	label = nil;
-	placeHolder = [CLString stringWithFormat:@"$%02X", val];
-      }
-      
-      switch (oc->type) {
-      case 'B':
-      case 0:
-	[mString appendFormat:@" %@", placeHolder];
-	break;
-      case '#':
-	[mString appendFormat:@" #%@", placeHolder];
-	break;
-      case '-':
-	[mString appendFormat:@" (%@),Y", placeHolder];
-	break;
-      case '+':
-	[mString appendFormat:@" (%@,X)", placeHolder];
-	break;
-      case '(':
-	[mString appendFormat:@" (%@)", placeHolder];
-	break;
-      case '[':
-	[mString appendFormat:@" [%@]", placeHolder];
-	break;
-      case 'X':
-      case 'Y':
-	[mString appendFormat:@" %@,%c", placeHolder, oc->type];
-	break;
-      case 's':
-	[mString appendFormat:@" (,S)", placeHolder];
-	break;
-      case 'y':
-	[mString appendFormat:@" [%@],Y", placeHolder];
-	break;
-      default:
-	[self error:@"Unknown mnemonic type %c", oc->type];
-	break;
       }
     }
 
     if (![assembly objectForKey:[CLNumber numberWithUnsignedInt:progCounter]])
-      [self addAssembly:mString value:val length:oc->length entryPoint:progCounter == start
+      [self addAssembly:oc->mnem value:val length:oc->length entryPoint:progCounter == start
 		     at:progCounter];
 
     progCounter += oc->length;
     
-    if (oc->type == 'B' || [oc->mnem isEqualToString:@"JSR"]) {
+    if (oc->type & OpcodeBranch || oc->type & OpcodeCall) {
       [self pushStack:val];
 
       /* FIXME - don't hardcode this in */
-      if ([oc->mnem isEqualToString:@"JSR"]) {
+      if (oc->type & OpcodeCall) {
 	switch (val) {
 	case 0x5A6F:
 	  progCounter += [self declareBytes:3 at:progCounter];
@@ -294,12 +244,12 @@ typedef struct {
       }
     }
 
-    if ([oc->mnem isEqualToString:@"JMP"]) {
-      if (!oc->type)
+    if (oc->type & OpcodeJump) {
+      if (!(oc->type & OpcodeIndirect))
 	[self pushStack:val];
       return;
     }
-    else if ([oc->mnem isEqualToString:@"RTS"])
+    else if (oc->type & OpcodeReturn)
       return;
   }
 
@@ -460,11 +410,11 @@ typedef struct {
   if ([binary length] - progCounter)
     [self declareDataFrom:progCounter to:[binary length] + origin];
 
-  printf("%" LABEL_COL "sORG $%04X\n", " ", origin);
+  printf("\tORG $%04X\n", origin);
   printf("\n");
 
   for (i = 0; appleSubs[i].label; i++)
-    printf("%" LABEL_COL "sEQU $%04X\n",
+    printf("%s\tEQU $%04X\n",
 	   [appleSubs[i].label UTF8String], appleSubs[i].address);
   printf("\n");
   
@@ -474,7 +424,7 @@ typedef struct {
     if (i && [asmObj isEntryPoint])
       printf("\n");
     label = [[labels objectForKey:[anArray objectAtIndex:i]] stringByAppendingString:@":"];
-    printf("%" LABEL_COL "s%s\n", label ? [label UTF8String] : "",
+    printf("%s\t%s\n", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels] UTF8String]);
   }
   
