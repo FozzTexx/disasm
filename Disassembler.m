@@ -11,6 +11,20 @@
 
 #import "opcode6502.h"
 
+#if EPSON
+#define DUNNO1 0x589C
+#define INIBUF 0x5A0A
+#define FREBUF 0x5A49
+#define ZPSAVE 0x5A6F
+#define DUNNO2 0x5B0E
+#else
+#define DUNNO1 0x5952
+#define INIBUF 0x5AC0
+#define FREBUF 0x5AFF
+#define ZPSAVE 0x5B25
+#define DUNNO2 0x5BC4
+#endif
+
 @implementation Disassembler
 
 -(id) init
@@ -121,7 +135,7 @@
 
   for (i = 0; i < len; i++) {
     val = [self valueAt:address length:2];
-    [self addAssembly:@"adr %@" value:val length:len * 2 entryPoint:NO at:address type:0];
+    [self addAssembly:@"adr %@" value:val length:2 entryPoint:NO at:address type:0];
   }
 
   return len * 2;
@@ -194,33 +208,7 @@
       /* FIXME - don't hardcode this in */
       if (oc->type & OpcodeCall) {
 	switch (val) {
-	case 0x5A6F:
-	  progCounter += [self declareBytes:3 at:progCounter];
-	  break;
-
-	case 0x5A49:
-	  progCounter += [self declareBytes:1 at:progCounter];
-	  break;
-
-	case 0x5B0E:
-	  {
-	    int addrCount;
-
-
-	    addrCount = [self valueAt:progCounter length:1] * 2;
-	    
-	    progCounter += [self declareBytes:4 at:progCounter];
-
-	    for (; addrCount; addrCount--) {
-	      val = [self valueAt:progCounter length:2];
-	      if (val >= origin && val < [binary length] + origin)
-		[self pushStack:val];
-	      progCounter += [self declareWords:1 at:progCounter];
-	    }
-	  }
-	  break;
-
-	case 0x589C:
+	case DUNNO1:
 	  {
 	    int addrCount;
 
@@ -238,10 +226,38 @@
 	  }
 	  break;
 	  
-	case 0x5A0A:
+	case INIBUF:
 	  val = [self valueAt:progCounter length:2];
 	  [self pushStack:val];
 	  progCounter += [self declareWords:1 at:progCounter];
+	  break;
+
+	case FREBUF:
+	  progCounter += [self declareBytes:1 at:progCounter];
+	  break;
+
+	case ZPSAVE:
+	  progCounter += [self declareBytes:1 at:progCounter];
+	  progCounter += [self declareWords:1 at:progCounter];
+	  break;
+
+	case DUNNO2:
+	  {
+	    int addrCount;
+
+
+	    addrCount = [self valueAt:progCounter length:1] * 2;
+	    
+	    progCounter += [self declareBytes:4 at:progCounter];
+
+	    for (; addrCount; addrCount--) {
+	      val = [self valueAt:progCounter length:2];
+	      if (val >= origin && val < [binary length] + origin)
+		[self pushStack:val];
+	      progCounter += [self declareWords:1 at:progCounter];
+	    }
+	  }
+	  break;
 	}
       }
     }
@@ -358,29 +374,6 @@
   
   [stack removeAllObjects];
   [stack addObject:[CLNumber numberWithUnsignedInt:entry]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:entry + 16]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x233A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x2399]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x23E2]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x342A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x3440]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x345F]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x4011]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x407E]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x4B09]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x54B7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5539]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5594]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5622]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5870]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5923]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5940]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5AE7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BD3]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BF8]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C1B]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C6A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C99]];
 
   while ([stack count]) {
     pool = [[CLAutoreleasePool alloc] init];

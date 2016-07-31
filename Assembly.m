@@ -44,9 +44,11 @@
   CLString *label = nil;
 
 
-  if (len > 1 && !(type & OpcodeImmediate)) {
-    num = [CLNumber numberWithUnsignedInt:value];
-    label = [labels objectForKey:num];
+  if (len > 1) {
+    if (!(type & OpcodeImmediate)) {
+      num = [CLNumber numberWithUnsignedInt:value];
+      label = [labels objectForKey:num];
+    }
     if (!label)
       label = [disasm formatHex:value length:(len - 1) * 2];
   }
