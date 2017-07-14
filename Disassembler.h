@@ -4,6 +4,8 @@
  * $Id$
  */
 
+#import "subroutine.h"
+
 #import <ClearLake/ClearLake.h>
 
 @interface Disassembler:CLObject
@@ -13,6 +15,9 @@
   CLMutableArray *stack;
   CLMutableDictionary *assembly;
   CLMutableDictionary *labels;
+  subroutine *subs;
+
+  BOOL relativeLabels;
 }
 
 -(id) init;
@@ -24,5 +29,8 @@
 -(void) addLabels:(CLString *) aString;
 
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len;
+
+-(void) setSubroutines:(CLString *) aString;
+-(void) setRelativeLabels:(BOOL) flag;
 
 @end

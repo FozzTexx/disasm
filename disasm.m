@@ -34,10 +34,11 @@ int main(int argc, char *argv[])
   if (count < 0 || (argc - count) != 1) {
     if (count < 0 && -count != '-')
       fprintf(stderr, "Bad flag: %c\n", -count);
-    fprintf(stderr, "Usage: %s [-flags] <serial>\n"
+    fprintf(stderr, "Usage: %s [-flags] <binary>\n"
 	                "Flags are:\n"
 	    "\to: origin address\n"
 	    "\te: entry point\n"
+	    "\ts: subroutine type (apple, vic20)\n"
 	    , *argv);
     exit(1);
   }
@@ -52,6 +53,8 @@ int main(int argc, char *argv[])
   aData = [CLData dataWithContentsOfFile:[CLString stringWithUTF8String:argv[count]]];
 
   disasm = [[Disassembler alloc] initWithBinary:aData origin:origin entry:entry];
+  [disasm setSubroutines:@"vic20"];
+  //[disasm setRelativeLabels:YES];
   [disasm addLabels:labels];
   [disasm disassemble];
   [disasm release];

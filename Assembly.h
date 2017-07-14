@@ -28,5 +28,6 @@
 -(CLUInteger) value;
 -(CLUInteger) length;
 -(BOOL) isEntryPoint;
+-(OpcodeType) type;
 
 @end

@@ -7,10 +7,12 @@
 #import "Disassembler.h"
 #import "Assembly.h"
 #import "AppleLabels.h"
+#import "VIC20Labels.h"
 #import "disasm.h"
 
 #import "opcode6502.h"
 
+#if 0
 #if EPSON
 #define DUNNO1 0x589C
 #define INIBUF 0x5A0A
@@ -24,6 +26,14 @@
 #define ZPSAVE 0x5B25
 #define DUNNO2 0x5BC4
 #endif
+#endif
+
+enum {
+  ModeNone = 0,
+  ModeString,
+  ModeBinary,
+  ModeAddress,
+};
 
 @implementation Disassembler
 
@@ -34,9 +44,6 @@
 
 -(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org entry:(CLUInteger) ent
 {
-  int i;
-
-  
   [super init];
   binary = [aData retain];
   origin = org;
@@ -45,10 +52,6 @@
   assembly = [[CLMutableDictionary alloc] init];
   labels = [[CLMutableDictionary alloc] init];
 
-  for (i = 0; appleSubs[i].label; i++)
-    [labels setObject:appleSubs[i].label
-	       forKey:[CLNumber numberWithUnsignedInt:appleSubs[i].address]];
-  
   return self;
 }
 
@@ -122,7 +125,7 @@
     [mString appendFormat:@" %@",
 	  [self formatHex:[self valueAt:address + i length:1] length:2]];
   }
-  [self addAssembly:mString value:0 length:len entryPoint:NO at:address type:0];
+  [self addAssembly:mString value:0 length:len entryPoint:NO at:address type:OpcodeConst];
 
   return len;
 }
@@ -135,10 +138,25 @@
 
   for (i = 0; i < len; i++) {
     val = [self valueAt:address length:2];
-    [self addAssembly:@"adr %@" value:val length:2 entryPoint:NO at:address type:0];
+    [self addAssembly:@"adr %@" value:val length:2 entryPoint:NO at:address
+		 type:OpcodeConst];
   }
 
   return len * 2;
+}
+
+-(CLString *) labelForAddress:(CLUInteger) address
+{
+  uint16_t offset;
+
+  
+  if (relativeLabels) {
+    offset = address;
+    offset -= entry;
+    return [CLString stringWithFormat:@"R%04X", offset];
+  }
+  
+  return [CLString stringWithFormat:@"L%04X", address];
 }
 
 -(void) addLabel:(CLString *) aString at:(CLUInteger) address
@@ -151,6 +169,30 @@
   return;
 }
 
+-(CLNumber *) assemblyWithAddress:(CLNumber *) anAddress
+{
+  CLArray *anArray;
+  int i, j;
+  Assembly *asmObj;
+  CLNumber *asmAddress;
+
+  
+  anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
+  for (i = 0, j = [anArray count]; i < j; i++) {
+    if ([((CLNumber *) [anArray objectAtIndex:i]) compare:anAddress] > 0)
+      break;
+  }
+
+  if (i) {
+    asmAddress = [anArray objectAtIndex:i-1];
+    asmObj = [assembly objectForKey:asmAddress];
+    if ([asmObj length] + [asmAddress unsignedIntValue] > [anAddress unsignedIntValue])
+      return asmAddress;
+  }
+
+  return nil;
+}
+
 -(void) disassembleFrom:(CLUInteger) start
 {
   CLUInteger progCounter, val, instr, len;
@@ -159,7 +201,7 @@
 
 
   progCounter = start;
-  [self addLabel:[CLString stringWithFormat:@"L%04X", progCounter] at:progCounter];
+  [self addLabel:[self labelForAddress:progCounter] at:progCounter];
   
   for (;;) {
     if (progCounter < origin || progCounter >= [binary length] + origin)
@@ -168,8 +210,8 @@
     instr = [self valueAt:progCounter length:1];
     oc = &opcodes[instr];
 
-    if ([oc->mnem isEqualToString:@"BRK"])
-      [self error:@"Unlikely: %04X", progCounter];
+    if ([oc->mnem isEqualToString:@"BRK"] || !oc->mnem)
+      [self error:@"Unlikely: %04X $%02X", progCounter, oc->code];
 
     if (oc->length - 1)
       val = [self valueAt:progCounter + 1 length:oc->length - 1];
@@ -190,21 +232,37 @@
 	num = [CLNumber numberWithUnsignedInt:val];
 	if ((val >= origin && val < [binary length] + origin) ||
 	    [labels objectForKey:num]) {
-	  label = [CLString stringWithFormat:@"L%04X", val];
+	  label = [self labelForAddress:val];
 	  [self addLabel:label at:val];
 	}
       }
     }
 
-    if (![assembly objectForKey:[CLNumber numberWithUnsignedInt:progCounter]])
-      [self addAssembly:oc->mnem value:val length:oc->length entryPoint:progCounter == start
-		     at:progCounter type:oc->type];
+    {
+      Assembly *asmObj;
+      CLNumber *anAddress, *nearest;
+
+
+      anAddress = [CLNumber numberWithUnsignedInt:progCounter];
+      nearest = [self assemblyWithAddress:anAddress];
+      asmObj = [assembly objectForKey:nearest];
+      if ([nearest compare:anAddress]) {
+	len = [anAddress unsignedIntValue] - [nearest unsignedIntValue];
+	[assembly removeObjectForKey:nearest];
+	[self declareBytes:len at:[nearest unsignedIntValue]];
+	asmObj = nil;
+      }
+      if (!asmObj)
+	[self addAssembly:oc->mnem value:val length:oc->length
+	       entryPoint:progCounter == start at:progCounter type:oc->type];
+    }
 
     progCounter += oc->length;
     
     if (oc->type & OpcodeBranch || oc->type & OpcodeCall) {
       [self pushStack:val];
 
+#if 0
       /* FIXME - don't hardcode this in */
       if (oc->type & OpcodeCall) {
 	switch (val) {
@@ -260,6 +318,7 @@
 	  break;
 	}
       }
+#endif
     }
 
     if (oc->type & OpcodeJump) {
@@ -277,8 +336,10 @@
 -(void) declareDataFrom:(CLUInteger) start to:(CLUInteger) end
 {
   CLUInteger len = end - start;
-  int i, j, b, val, si;
+  int i, j, b, val, dval, si, mode;
   CLMutableString *mString;
+  CLString *aLabel;
+  CLNumber *anAddress;
 
 
   if (end < start)
@@ -286,57 +347,106 @@
   
   mString = [[CLMutableString alloc] init];
 
-  [self addLabel:[CLString stringWithFormat:@"L%04X", start] at:start];
+  [self addLabel:[self labelForAddress:start] at:start];
+
+#if 1
+  for (si = 0; si < len - 1; si++) {
+    val = [self valueAt:start + si length:2];
+    anAddress = [CLNumber numberWithUnsignedInt:val];
+    aLabel = [labels objectForKey:anAddress];
+    if (!aLabel && val >= origin && val < [binary length] + origin) {
+      aLabel = [self labelForAddress:val];
+      [self addLabel:aLabel at:val];
+
+#if 0
+      asmAddress = [self assemblyWithAddress:anAddress];
+      if ([asmAddress compare:anAddress]) {
+	asmObj = [assembly objectForKey:asmAddress];
+	fprintf(stderr, "Entry into existing block $%04x $%04x\n", val,
+		[asmAddress unsignedIntValue]);
+      }
+#endif
+    }
+  }
+#endif
   
   for (i = 0; i < len; ) {
+    mode = ModeNone;
     for (si = i; si < len; si++) {
-      val = [self valueAt:start + si length:1];
-      if (val >= ' ' && val <= '~')
+      if (si > i && [labels objectForKey:[CLNumber numberWithUnsignedInt:si]])
 	break;
+      
+      val = [self valueAt:start + si length:1];
+      aLabel = nil;
+      if (si < len - 1) {
+	dval = [self valueAt:start + si length:2];
+	anAddress = [CLNumber numberWithUnsignedInt:dval];
+	aLabel = [labels objectForKey:anAddress];
+      }
+
+      if (aLabel) {
+	if (si - i)
+	  break;
+
+	[self declareWords:1 at:start + si];
+	si += 2;
+	i += 2;
+	break;
+      }
+
+      if (val >= ' ' && val <= '~') {
+	if (mode == ModeBinary)
+	  break;
+	mode = ModeString;
+      }
+      else {
+	if (mode == ModeString)
+	  break;
+	mode = ModeBinary;
+      }
     }
 
     if (si - i) {
-      [mString setString:@"byt"];
-      for (j = i, b = 0; j < si; j++, b++) {
-	if (b)
-	  [mString appendString:@","];
-	[mString appendFormat:@" %@",
-	      [self formatHex:[self valueAt:start + j length:1] length:2]];
-	if (b == 9) {
-	  [self addAssembly:mString value:0 length:b + 1 entryPoint:NO
-			 at:start + j - b type:0];
-	  b = -1;
-	  [mString setString:@"byt"];
+      if (mode == ModeBinary) {
+	[mString setString:@"byt"];
+	for (j = i, b = 0; j < si; j++, b++) {
+	  if (b)
+	    [mString appendString:@","];
+	  [mString appendFormat:@" %@",
+		[self formatHex:[self valueAt:start + j length:1] length:2]];
+	  if (b == 9) {
+	    [self addAssembly:mString value:0 length:b + 1 entryPoint:NO
+			   at:start + j - b type:OpcodeConst];
+	    b = -1;
+	    [mString setString:@"byt"];
+	  }
 	}
+	if (b)
+	  [self addAssembly:mString value:0 length:b entryPoint:NO at:start + j - b
+		       type:OpcodeConst];
       }
-      if (b)
-	[self addAssembly:mString value:0 length:b entryPoint:NO at:start + j - b type:0];
-    }
-
-    i = si;
-
-    for (si = i; si < len; si++) {
-      val = [self valueAt:start + si length:1];
-      if (val < ' ' || val > '~')
-	break;
-    }
-
-    if (si - i) {
-      [mString setString:@"byt \""];
-      for (j = i; j < si; j++) {
-	val = [self valueAt:start + j length:1];
-	if (val == '\\' || val == '"')
-	  [mString appendString:@"\\"];
-	[mString appendFormat:@"%c", val];
+      else {
+	[mString setString:@"byt \""];
+	for (j = i; j < si; j++) {
+	  val = [self valueAt:start + j length:1];
+	  if (val == '\\' || val == '"') {
+	    [mString appendString:@"\\"];
+	    if (val == '"')
+	      val = 'I';
+	  }
+	  [mString appendFormat:@"%c", val];
+	}
+	[mString appendString:@"\""];
+	[self addAssembly:mString value:0 length:si - i entryPoint:NO at:start + i
+		     type:OpcodeConst];
       }
-      [mString appendString:@"\""];
-      [self addAssembly:mString value:0 length:si - i entryPoint:NO at:start + i type:0];
     }
 
     i = si;
   }
 
   [mString release];
+  return;
 }
 
 -(Assembly *) findDataBlock:(CLNumber *) address
@@ -360,6 +470,59 @@
   return nil;
 }
 
+-(CLNumber *) nextLabeledAddressAfter:(CLNumber *) anAddress
+{
+  CLArray *anArray;
+  int i, j;
+  CLNumber *asmAddress;
+  Assembly *asmObj;
+
+
+  asmObj = [assembly objectForKey:anAddress];
+#if 0
+  anAddress = [CLNumber numberWithUnsignedInt:[anAddress unsignedIntValue] + [asmObj length]];
+#endif
+  anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
+  for (i = 0, j = [anArray count]; i < j; i++) {
+    asmAddress = [anArray objectAtIndex:i];
+    if ([assembly objectForKey:asmAddress] && [asmAddress compare:anAddress] > 0)
+      return asmAddress;
+  }
+
+  return nil;
+}
+
+-(CLNumber *) hashBlockAt:(CLNumber *) anAddress
+{
+  CLNumber *start, *next = [self nextLabeledAddressAfter:anAddress];
+  CLMutableString *mString;
+  Assembly *asmObj;
+  CLString *line;
+
+
+  if (!next)
+    next = [CLNumber numberWithUnsignedInt:origin + [binary length]];
+  start = anAddress;
+  mString = [CLMutableString string];
+  while ([anAddress compare:next] < 0) {
+    if (!(asmObj = [assembly objectForKey:anAddress]))
+      break;
+    if ([asmObj length] < 3 && !([asmObj type] & OpcodeRelative) &&
+	!([asmObj type] & OpcodeConst))
+      line = [asmObj lineWithLabel:nil disassembler:self];
+    else
+      line = [asmObj line];
+    [mString appendString:line];
+    anAddress = [CLNumber numberWithUnsignedInt:
+			    [anAddress unsignedIntValue] + [asmObj length]];
+  }
+#if 0
+  fprintf(stderr, "%04x: %s\n", [start unsignedIntValue], [mString UTF8String]);
+#endif
+
+  return [CLNumber numberWithUnsignedInt:[mString hash] & 0xffff];
+}
+
 -(void) disassemble
 {
   CLUInteger progCounter;
@@ -374,6 +537,33 @@
   
   [stack removeAllObjects];
   [stack addObject:[CLNumber numberWithUnsignedInt:entry]];
+#if 0
+  [stack addObject:[CLNumber numberWithUnsignedInt:entry + 16]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x233A]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x2399]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x23E2]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x342A]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x3440]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x345F]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x4011]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x407E]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x4B09]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x54B7]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5539]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5594]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5622]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5870]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5923]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5940]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5AE7]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BD3]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BF8]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C1B]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C6A]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C99]];
+#else
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA2B0]];
+#endif
 
   while ([stack count]) {
     pool = [[CLAutoreleasePool alloc] init];
@@ -398,7 +588,7 @@
   for (i = 0, progCounter = origin, j = [anArray count]; i < j; i++) {
     num = [anArray objectAtIndex:i];
     asmObj = [assembly objectForKey:num];
-    if ([num unsignedIntValue] - progCounter)
+    if (progCounter < [num unsignedIntValue] && [num unsignedIntValue] - progCounter)
       [self declareDataFrom:progCounter to:[num unsignedIntValue]];
     progCounter = [num unsignedIntValue] + [asmObj length];
   }
@@ -406,22 +596,97 @@
   if ([binary length] - progCounter)
     [self declareDataFrom:progCounter to:[binary length] + origin];
 
+  /* FIXME - make sure all labels within binary are pointing to
+     something by splitting data blocks */
+
+  {
+    CLNumber *anAddress, *asmAddress;
+    CLString *newLabel;
+
+    
+    anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    for (i = 0, j = [anArray count]; i < j; i++) {
+      anAddress = [anArray objectAtIndex:i];
+      val = [anAddress unsignedIntValue];
+
+      asmAddress = [self assemblyWithAddress:anAddress];
+      if ([asmAddress compare:anAddress]) {
+	asmObj = [assembly objectForKey:asmAddress];
+	newLabel = [CLString stringWithFormat:@"%@+%i",
+			[self labelForAddress:[asmAddress unsignedIntValue]],
+			     [anAddress unsignedIntValue] - [asmAddress unsignedIntValue]];
+	[labels setObject:newLabel forKey:anAddress];
+	if (![labels objectForKey:asmAddress])
+	  [labels setObject:[self labelForAddress:[asmAddress unsignedIntValue]]
+		     forKey:asmAddress];
+#if 0	
+	fprintf(stderr, "Entry into existing block $%04x $%04x\n", val,
+		[asmAddress unsignedIntValue]);
+#endif
+      }
+    }
+  }
+
+  {
+    CLNumber *anAddress, *hash;
+    CLString *newLabel, *oldLabel;
+    CLMutableDictionary *remap, *remap2;
+    CLRange aRange;
+    int lno;
+    CLUInteger dval;
+
+
+    remap = [CLMutableDictionary dictionary];
+    remap2 = [CLMutableDictionary dictionary];
+    anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    for (i = lno = 0, j = [anArray count]; i < j; i++) {
+      anAddress = [anArray objectAtIndex:i];
+      dval = [anAddress unsignedIntValue];
+      if (dval < origin || dval >= origin + [binary length])
+	continue;
+      oldLabel = [labels objectForKey:anAddress];
+      aRange = [oldLabel rangeOfString:@"+"];
+      hash = [self hashBlockAt:anAddress];
+      if (aRange.length)
+	newLabel = [[remap objectForKey:[oldLabel substringToIndex:aRange.location]]
+		     stringByAppendingString:[oldLabel substringFromIndex:aRange.location]];
+      else {
+	newLabel = [CLString stringWithFormat:@"G%04X", [hash unsignedIntValue]];
+	if ([[remap2 allKeysForObject:hash] count]) {
+	  newLabel = [CLString stringWithFormat:@"%c%04X",
+			       'G' + [[remap2 allKeysForObject:hash] count],
+			       [hash unsignedIntValue]];
+	  //[self error:@"Collision"];
+	}
+      }
+      [remap setObject:newLabel forKey:oldLabel];
+      [remap2 setObject:hash forKey:oldLabel];
+      [labels setObject:newLabel forKey:anAddress];
+    }
+  }
+  
   printf("\tORG %s\n", [[self formatHex:origin length:4] UTF8String]);
   printf("\n");
 
-  for (i = 0; appleSubs[i].label; i++)
-    printf("%s\tEQU %s\n", [appleSubs[i].label UTF8String],
-	   [[self formatHex:appleSubs[i].address length:4] UTF8String]);
+  for (i = 0; subs[i].label; i++)
+    printf("%s\tEQU %s\n", [subs[i].label UTF8String],
+	   [[self formatHex:subs[i].address length:4] UTF8String]);
   printf("\n");
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
-    asmObj = [assembly objectForKey:[anArray objectAtIndex:i]];
+    num = [anArray objectAtIndex:i];
+    asmObj = [assembly objectForKey:num];
     if (i && [asmObj isEntryPoint])
       printf("\n");
-    label = [[labels objectForKey:[anArray objectAtIndex:i]] stringByAppendingString:@":"];
-    printf("%s\t%s\n", label ? [label UTF8String] : "",
+    label = [[labels objectForKey:num] stringByAppendingString:@":"];
+    printf("%s\t%s", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
+#if 1
+    if (label)
+      printf("\t; $%04X", [[anArray objectAtIndex:i] unsignedIntValue]);
+#endif
+    printf("\n");
   }
   
   return;
@@ -450,6 +715,29 @@
 #else
   return [CLString stringWithFormat:@"$%0*X", len, aValue];
 #endif
+}
+
+-(void) setSubroutines:(CLString *) aString
+{
+  int i;
+
+  
+  if (![aString caseInsensitiveCompare:@"vic20"])
+    subs = vic20Subs;
+  else
+    subs = appleSubs;
+
+  for (i = 0; subs[i].label; i++)
+    [labels setObject:subs[i].label
+	       forKey:[CLNumber numberWithUnsignedInt:subs[i].address]];
+  
+  return;
+}
+
+-(void) setRelativeLabels:(BOOL) flag
+{
+  relativeLabels = flag;
+  return;
 }
 
 @end

@@ -7,14 +7,15 @@
 #define CSTYLE 0
 
 typedef enum {
-  OpcodeRelative =	0x01,
-  OpcodeImmediate =	0x02,
-  OpcodeIndirect =	0x04,
-  OpcodeBranch =	0x08,
-  OpcodeCall =		0x10,
-  OpcodeJump =		0x20,
-  OpcodeReturn =	0x40,
-  Opcode65c02 =		0x80,
+  OpcodeRelative =	0x001,
+  OpcodeImmediate =	0x002,
+  OpcodeIndirect =	0x004,
+  OpcodeBranch =	0x008,
+  OpcodeCall =		0x010,
+  OpcodeJump =		0x020,
+  OpcodeReturn =	0x040,
+  Opcode65c02 =		0x080,
+  OpcodeConst =		0x100,
 } OpcodeType;
 
 typedef struct {

@@ -4,10 +4,7 @@
  * $Id$
  */
 
-typedef struct {
-  CLUInteger address;
-  CLString *label;
-} subroutine;
+#import "subroutine.h"
 
 subroutine appleSubs[] = {
   {0x3CA, @"DOS3UN1"},

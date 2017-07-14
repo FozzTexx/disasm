@@ -48,6 +48,11 @@
     if (!(type & OpcodeImmediate)) {
       num = [CLNumber numberWithUnsignedInt:value];
       label = [labels objectForKey:num];
+      if (!label) {
+	num = [CLNumber numberWithUnsignedInt:value-1];
+	label = [labels objectForKey:num];
+	label = [label stringByAppendingString:@"+1"];
+      }
     }
     if (!label)
       label = [disasm formatHex:value length:(len - 1) * 2];
@@ -72,6 +77,11 @@
 -(BOOL) isEntryPoint
 {
   return entryPoint;
+}
+
+-(OpcodeType) type
+{
+  return type;
 }
 
 @end
