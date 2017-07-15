@@ -1,7 +1,21 @@
 /* Copyright 2016 by Chris Osborn <fozztexx@fozztexx.com>
  * http://insentricity.com
  *
- * $Id$
+ * This file is part of disasm.
+ *
+ * disasm is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2, or (at your option)
+ * any later version.
+ *
+ * disasm is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with disasm; see the file COPYING. If not see
+ * <http://www.gnu.org/licenses/>.
  */
 
 #import "Disassembler.h"
@@ -210,8 +224,13 @@ enum {
     instr = [self valueAt:progCounter length:1];
     oc = &opcodes[instr];
 
-    if ([oc->mnem isEqualToString:@"BRK"] || !oc->mnem)
+    if ([oc->mnem isEqualToString:@"BRK"] || !oc->mnem) {
+#if 0
+      fprintf(stderr, "Unlikely: %04X $%02X\n", progCounter, oc->code);
+      return;
+#endif
       [self error:@"Unlikely: %04X $%02X", progCounter, oc->code];
+    }
 
     if (oc->length - 1)
       val = [self valueAt:progCounter + 1 length:oc->length - 1];
@@ -349,7 +368,7 @@ enum {
 
   [self addLabel:[self labelForAddress:start] at:start];
 
-#if 1
+#if 0
   for (si = 0; si < len - 1; si++) {
     val = [self valueAt:start + si length:2];
     anAddress = [CLNumber numberWithUnsignedInt:val];
@@ -378,6 +397,7 @@ enum {
       
       val = [self valueAt:start + si length:1];
       aLabel = nil;
+#if 1
       if (si < len - 1) {
 	dval = [self valueAt:start + si length:2];
 	anAddress = [CLNumber numberWithUnsignedInt:dval];
@@ -393,7 +413,9 @@ enum {
 	i += 2;
 	break;
       }
+#endif
 
+#if 0
       if (val >= ' ' && val <= '~') {
 	if (mode == ModeBinary)
 	  break;
@@ -404,6 +426,9 @@ enum {
 	  break;
 	mode = ModeBinary;
       }
+#else
+      mode = ModeBinary;
+#endif
     }
 
     if (si - i) {
@@ -562,7 +587,119 @@ enum {
   [stack addObject:[CLNumber numberWithUnsignedInt:0x5C6A]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0x5C99]];
 #else
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA02D]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA037]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA079]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA08C]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0A7]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0B7]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0DA]];
+  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0E4]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA2B0]];
+  if (entry == 0xa37e) {
+    CLUInteger addr;
+
+    
+    addr = 0xA2FF - 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA4DC - 4;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA4FA + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA56A + 2;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA5E8 + 25;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA80F + 19;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA8CD + 8;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA960 - 0x46;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA94E - 4;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA9A9 + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAA5E + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAA73 + 1;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAA98 + 7;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAAAA + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAAAA + 12;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+
+    addr = 0xA393 + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA638 + 15;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA83E + 13;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA959 + 7;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA98B + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA99F + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAA64 + 4;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+
+    [stack addObject:[CLNumber numberWithUnsignedInt:0xac6a]];
+    [self declareWords:1 at:0xacfd + 3];
+  }
+  else if (entry == 0xa383) {
+    CLUInteger addr;
+
+    
+    addr = 0xA2FE + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA555 + 4;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA601 + 5;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA68F - 2;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA884 + 13;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA8AE + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA99F + 7;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA9D1 + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA9E5 + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAA38 + 14;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAAAA + 4;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAAEE + 2;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xAAFC + 5;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+
+    addr = 0xA398 + 10;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA53A + 6;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA62E + 25;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA855 + 19;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA913 + 8;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA978 - 24;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+    addr = 0xA97F + 17;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+
+    [stack addObject:[CLNumber numberWithUnsignedInt:0xac7b]];
+    //[stack addObject:[CLNumber numberWithUnsignedInt:0xab39]];
+
+    [self declareWords:1 at:0xacfb + 5];
+  }
 #endif
 
   while ([stack count]) {
@@ -575,6 +712,7 @@ enum {
     [pool release];
   }
 
+#if 0
   anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
     num = [anArray objectAtIndex:i];
@@ -583,6 +721,7 @@ enum {
       [self declareDataFrom:[num unsignedIntValue] to:[num unsignedIntValue] + 1];
     }
   }
+#endif
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, progCounter = origin, j = [anArray count]; i < j; i++) {
