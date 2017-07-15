@@ -20,7 +20,7 @@
 
 #import "opcodes.h"
 
-#ifndef CSTYLE
+#if !CSTYLE
 opcode opcodes[] = {
   {0x00, 1, @"BRK", 0},
   {0x01, 2, @"ORA (%@,X)", OpcodeIndirect},

@@ -596,6 +596,14 @@ enum {
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA0DA]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA0E4]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA2B0]];
+
+  {
+    CLUInteger addr;
+
+    addr = 0xAFB7;
+    [self addLabel:[self labelForAddress:addr] at:addr];
+  }
+  
   if (entry == 0xa37e) {
     CLUInteger addr;
 
