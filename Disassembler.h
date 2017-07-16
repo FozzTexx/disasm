@@ -27,9 +27,7 @@
   CLUInteger origin, entry;
   CLData *binary;
   CLMutableArray *stack;
-  CLMutableDictionary *assembly;
-  CLMutableDictionary *labels;
-  subroutine *subs;
+  CLMutableDictionary *assembly, *labels, *subs;
 
   BOOL relativeLabels;
 }
@@ -46,5 +44,7 @@
 
 -(void) setSubroutines:(CLString *) aString;
 -(void) setRelativeLabels:(BOOL) flag;
+
+-(void) addSubroutine:(CLString *) label at:(CLUInteger) address;
 
 @end

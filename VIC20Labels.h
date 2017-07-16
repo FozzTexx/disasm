@@ -21,6 +21,12 @@
 #import "subroutine.h"
 
 subroutine vic20Subs[] = {
+  {0x91, @"LIVES"},
+  {0x9B, @"GRAPH0"},
+  {0x9D, @"SCRVC0"},
+  {0x9F, @"SCRVC1"},
+  {0xC9, @"JMPVC0"},
+  {0xCB, @"JMPVC1"},
   {0x314, @"IRQVEC"},
   {0x316, @"BRKVEC"},
   {0x318, @"NMIVEC"},
