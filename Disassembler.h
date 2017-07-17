@@ -40,6 +40,7 @@
 
 -(void) addLabels:(CLString *) labels;
 -(void) addEntryPoints:(CLString *) entries;
+-(void) addDataBlocks:(CLString *) blockString;
 
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len;
 

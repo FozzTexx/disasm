@@ -35,7 +35,7 @@ CLUInteger parseUnsigned(CLString *aString)
 int main(int argc, char *argv[])
 {
   int count;
-  CLString *org = nil, *entry = nil, *labels = nil;
+  CLString *org = nil, *entry = nil, *labels = nil, *data = nil;
   CLUInteger origin = 0;
   CLData *aData;
   Disassembler *disasm;
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 
   pool = [[CLAutoreleasePool alloc] init];
 
-  count = CLGetArgs(argc, argv, @"osesls", &org, &entry, &labels);
+  count = CLGetArgs(argc, argv, @"oseslsds", &org, &entry, &labels, &data);
 
   /* FIXME - allow declaring data blocks and type: binary, string, word */
   /* FIXME - option to disable/enable looking for addresses in data */
@@ -60,6 +60,7 @@ int main(int argc, char *argv[])
 	    "\to: origin address\n"
 	    "\te: entry point(s), separate by commas or file with separate lines\n"
 	    "\tl: create label for address(es), separate by commas or file with separate lines\n"
+	    "\td: declare data blocks at ranges, use /A or /W for words\n"
 	    "\ts: subroutine type (apple, vic20)\n"
 	    , *argv);
     exit(1);
@@ -77,6 +78,7 @@ int main(int argc, char *argv[])
   //[disasm setRelativeLabels:YES];
   [disasm addLabels:labels];
   [disasm addEntryPoints:entry];
+  [disasm addDataBlocks:data];
   [disasm disassemble];
   [disasm release];
 

@@ -505,32 +505,6 @@ enum {
   [stack removeAllObjects];
   [stack addObjectsFromArray:entries];
 
-#if 0
-  /* FIXME - use command line options, don't hardcode this stuff */
-
-  {
-    CLUInteger addr, addr2;
-
-
-    if (entry == 0xa37e) {
-      addr = 0xace6;
-      addr2 = 0xad00;
-      [self declareBytes:addr2 - addr at:addr];
-      [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
-      [self addLabel:[self labelForAddress:addr2] at:addr2];
-      [self declareWords:33 at:0xa2c6];
-    }
-    else if (entry == 0xa383) {
-      addr = 0xacfb;
-      addr2 = 0xad00;
-      [self declareBytes:addr2 - addr at:addr];
-      [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
-      [self addLabel:[self labelForAddress:addr2] at:addr2];
-      [self declareWords:33 at:0xa2cb];
-    }
-  }
-#endif
-
   while ([stack count]) {
     pool = [[CLAutoreleasePool alloc] init];
     num = [stack lastObject];
@@ -721,6 +695,59 @@ enum {
     
     [entries addObject:[CLNumber numberWithUnsignedInt:
 				   parseUnsigned(aString)]];
+  }
+
+  return;
+}
+
+-(void) addDataBlocks:(CLString *) blockString
+{
+  CLArray *anArray;
+  int i, j, type, len;
+  CLString *aString;
+  CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
+  CLRange aRange;
+  CLUInteger begin, end;
+  
+
+  if (access([blockString UTF8String], F_OK) == 0) {
+    aString = [CLString stringWithContentsOfFile:blockString encoding:CLUTF8StringEncoding];
+    blockString = aString;
+  }
+  
+  anArray = [blockString componentsSeparatedByCharactersInSet:sep];
+  for (i = 0, j = [anArray count]; i < j; i++) {
+    aString = [[anArray objectAtIndex:i] stringByTrimmingWhitespaceAndNewlines];
+    if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
+      continue;
+
+    type = 0;
+    aRange = [aString rangeOfString:@"/"];
+    if (aRange.length) {
+      type = [[[[aString substringFromIndex:CLMaxRange(aRange)]
+			stringByTrimmingWhitespaceAndNewlines] uppercaseString]
+	       characterAtIndex:0];
+      aString = [aString substringToIndex:aRange.location];
+    }
+    aRange = [aString rangeOfString:@"-"];
+    if (aRange.length) {
+      begin = parseUnsigned([[aString substringToIndex:aRange.location]
+			      stringByTrimmingWhitespaceAndNewlines]);
+      end = parseUnsigned([[aString substringFromIndex:CLMaxRange(aRange)]
+			      stringByTrimmingWhitespaceAndNewlines]);
+    }
+    else 
+      begin = end = parseUnsigned([[aString substringToIndex:aRange.location]
+				    stringByTrimmingWhitespaceAndNewlines]);
+
+    if (type == 'A' || type == 'W') {
+      len = (end - begin + 1) / 2;
+      [self declareWords:len at:begin];
+    }
+    else {
+      len = end - begin;
+      [self declareBytes:len at:begin];
+    }
   }
 
   return;
