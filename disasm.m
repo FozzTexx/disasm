@@ -23,6 +23,7 @@
 
 CLUInteger parseUnsigned(CLString *aString)
 {
+  /* FIXME - support math operations */
   if ([aString hasPrefix:@"$"])
     aString = [CLString stringWithFormat:@"0x%@", [aString substringFromIndex:1]];
   if ([aString hasSuffix:@"H"] || [aString hasSuffix:@"h"])
@@ -34,8 +35,8 @@ CLUInteger parseUnsigned(CLString *aString)
 int main(int argc, char *argv[])
 {
   int count;
-  CLString *org = nil, *ent = nil, *labels = nil;
-  CLUInteger origin = 0, entry = 0;
+  CLString *org = nil, *entry = nil, *labels = nil;
+  CLUInteger origin = 0;
   CLData *aData;
   Disassembler *disasm;
   CLAutoreleasePool *pool;
@@ -43,11 +44,8 @@ int main(int argc, char *argv[])
 
   pool = [[CLAutoreleasePool alloc] init];
 
-  count = CLGetArgs(argc, argv, @"osesls", &org, &ent, &labels);
+  count = CLGetArgs(argc, argv, @"osesls", &org, &entry, &labels);
 
-  /* FIXME - allow defining constants (EQU) */
-  /* FIXME - allow defining labels for specific addresses */
-  /* FIXME - allow setting multiple entry points */
   /* FIXME - allow declaring data blocks and type: binary, string, word */
   /* FIXME - option to disable/enable looking for addresses in data */
   /* FIXME - option to disable/enable looking for strings in data */
@@ -60,7 +58,8 @@ int main(int argc, char *argv[])
     fprintf(stderr, "Usage: %s [-flags] <binary>\n"
 	                "Flags are:\n"
 	    "\to: origin address\n"
-	    "\te: entry point\n"
+	    "\te: entry point(s), separate by commas or file with separate lines\n"
+	    "\tl: create label for address(es), separate by commas or file with separate lines\n"
 	    "\ts: subroutine type (apple, vic20)\n"
 	    , *argv);
     exit(1);
@@ -68,17 +67,16 @@ int main(int argc, char *argv[])
 
   if (org)
     origin = parseUnsigned(org);
-  if (ent)
-    entry = parseUnsigned(ent);
-  else
-    entry = origin;
+  if (!entry)
+    entry = org;
 
   aData = [CLData dataWithContentsOfFile:[CLString stringWithUTF8String:argv[count]]];
 
-  disasm = [[Disassembler alloc] initWithBinary:aData origin:origin entry:entry];
-  [disasm setSubroutines:@"vic20"];
+  disasm = [[Disassembler alloc] initWithBinary:aData origin:origin];
+  [disasm setConstants:@"vic20"];
   //[disasm setRelativeLabels:YES];
   [disasm addLabels:labels];
+  [disasm addEntryPoints:entry];
   [disasm disassemble];
   [disasm release];
 

@@ -26,6 +26,8 @@
 
 #import "opcode6502.h"
 
+#include <unistd.h>
+
 enum {
   ModeNone = 0,
   ModeString,
@@ -37,18 +39,19 @@ enum {
 
 -(id) init
 {
-  return [self initWithBinary:nil origin:0 entry:0];
+  return [self initWithBinary:nil origin:0];
 }
 
--(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org entry:(CLUInteger) ent
+-(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org
 {
   [super init];
   binary = [aData retain];
   origin = org;
-  entry = ent;
   stack = [[CLMutableArray alloc] init];
   assembly = [[CLMutableDictionary alloc] init];
   labels = [[CLMutableDictionary alloc] init];
+  entries = [[CLMutableArray alloc] init];
+  subs = [[CLMutableDictionary alloc] init];
 
   return self;
 }
@@ -59,6 +62,7 @@ enum {
   [stack release];
   [assembly release];
   [labels release];
+  [entries release];
   [subs release];
   [super dealloc];
   return;
@@ -154,18 +158,22 @@ enum {
 
 -(CLString *) labelForAddress:(CLUInteger) address
 {
-  uint16_t offset;
   CLString *aLabel;
 
 
   aLabel = [labels objectForKey:[CLNumber numberWithUnsignedInt:address]];
   if (!aLabel) {
+#if 0
     if (relativeLabels) {
+      uint16_t offset;
+
+      
       offset = address;
       offset -= entry;
       aLabel = [CLString stringWithFormat:@"R%04X", offset];
     }
     else
+#endif
       aLabel = [CLString stringWithFormat:@"L%04X", address];
   }
 
@@ -444,10 +452,8 @@ enum {
   CLArray *anArray;
   int i, j;
   CLNumber *asmAddress;
-  Assembly *asmObj;
 
 
-  asmObj = [assembly objectForKey:anAddress];
   anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
     asmAddress = [anArray objectAtIndex:i];
@@ -460,7 +466,7 @@ enum {
 
 -(CLNumber *) hashBlockAt:(CLNumber *) anAddress
 {
-  CLNumber *start, *next = [self nextLabeledAddressAfter:anAddress];
+  CLNumber *next = [self nextLabeledAddressAfter:anAddress];
   CLMutableString *mString;
   Assembly *asmObj;
   CLString *line;
@@ -468,7 +474,6 @@ enum {
 
   if (!next)
     next = [CLNumber numberWithUnsignedInt:origin + [binary length]];
-  start = anAddress;
   mString = [CLMutableString string];
   while ([anAddress compare:next] < 0) {
     if (!(asmObj = [assembly objectForKey:anAddress]))
@@ -495,142 +500,33 @@ enum {
   Assembly *asmObj;
   CLNumber *num;
   CLString *label;
-  CLUInteger val;
 
   
   [stack removeAllObjects];
+  [stack addObjectsFromArray:entries];
 
-#if 1
+#if 0
   /* FIXME - use command line options, don't hardcode this stuff */
-  [stack addObject:[CLNumber numberWithUnsignedInt:entry]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA02D]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA037]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA079]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA08C]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0A7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0B7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0DA]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA0E4]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0xA2B0]];
 
   {
     CLUInteger addr, addr2;
 
 
     if (entry == 0xa37e) {
-      addr = 0xA2FF - 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA4DC - 4;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA4FA + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA56A + 2;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA5E8 + 25;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA80F + 19;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA8CD + 8;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA960 - 0x46;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA94E - 4;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA9A9 + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAA5E + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAA73 + 1;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAA98 + 7;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAAAA + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAAAA + 12;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-
-      addr = 0xA393 + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA638 + 15;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA83E + 13;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA959 + 7;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA98B + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA99F + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAA64 + 4;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-
-      [stack addObject:[CLNumber numberWithUnsignedInt:0xac6a]];
-
       addr = 0xace6;
       addr2 = 0xad00;
       [self declareBytes:addr2 - addr at:addr];
       [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
       [self addLabel:[self labelForAddress:addr2] at:addr2];
-      //[self declareWords:1 at:0xacfd + 3];
       [self declareWords:33 at:0xa2c6];
-
-      [self addSubroutine:@"VICRGS" at:0xa3df];
     }
     else if (entry == 0xa383) {
-      addr = 0xA2FE + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA555 + 4;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA601 + 5;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA68F - 2;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA884 + 13;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA8AE + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA99F + 7;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA9D1 + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA9E5 + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAA38 + 14;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAAAA + 4;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAAEE + 2;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xAAFC + 5;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-
-      addr = 0xA398 + 10;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA53A + 6;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA62E + 25;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA855 + 19;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA913 + 8;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA978 - 24;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-      addr = 0xA97F + 17;
-      [self addLabel:[self labelForAddress:addr] at:addr];
-
-      [stack addObject:[CLNumber numberWithUnsignedInt:0xac7b]];
-      //[stack addObject:[CLNumber numberWithUnsignedInt:0xab39]];
-
       addr = 0xacfb;
       addr2 = 0xad00;
       [self declareBytes:addr2 - addr at:addr];
       [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
       [self addLabel:[self labelForAddress:addr2] at:addr2];
-      //[self declareWords:1 at:0xacfb + 5];
       [self declareWords:33 at:0xa2cb];
-
-      [self addSubroutine:@"VICRGS" at:0xa429];
     }
   }
 #endif
@@ -665,8 +561,6 @@ enum {
     anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
     for (i = 0, j = [anArray count]; i < j; i++) {
       anAddress = [anArray objectAtIndex:i];
-      val = [anAddress unsignedIntValue];
-
       asmAddress = [self assemblyWithAddress:anAddress];
       if ([asmAddress compare:anAddress]) {
 	asmObj = [assembly objectForKey:asmAddress];
@@ -719,6 +613,7 @@ enum {
       else {
 	newLabel = [CLString stringWithFormat:@"G%04X", [hash unsignedIntValue]];
 	if ([[remap2 allKeysForObject:hash] count]) {
+	  /* FIXME - go to double characters if count is > 'Z' */
 	  newLabel = [CLString stringWithFormat:@"%c%04X",
 			       'G' + [[remap2 allKeysForObject:hash] count],
 			       [hash unsignedIntValue]];
@@ -770,17 +665,62 @@ enum {
   return;
 }
 
--(void) addLabels:(CLString *) aString
+-(void) addLabels:(CLString *) labelString
 {
-  CLArray *anArray, *label;
+  CLArray *anArray, *constant;
   int i, j;
+  CLString *aString;
+  CLUInteger addr;
+  CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
+  
 
-
-  anArray = [aString componentsSeparatedByString:@","];
+  if (access([labelString UTF8String], F_OK) == 0) {
+    aString = [CLString stringWithContentsOfFile:labelString encoding:CLUTF8StringEncoding];
+    labelString = aString;
+  }
+  
+  anArray = [labelString componentsSeparatedByCharactersInSet:sep];
   for (i = 0, j = [anArray count]; i < j; i++) {
-    label = [[anArray objectAtIndex:i] componentsSeparatedByString:@"="];
-    [self addLabel:[[label objectAtIndex:1] stringByTrimmingWhitespaceAndNewlines]
-		at:parseUnsigned([label objectAtIndex:0])];
+    aString = [[anArray objectAtIndex:i] stringByTrimmingWhitespaceAndNewlines];
+    if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
+      continue;
+    
+    constant = [aString componentsSeparatedByString:@"="];
+    if ([constant count] > 1) {
+      [self addConstant:[[constant objectAtIndex:0] stringByTrimmingWhitespaceAndNewlines]
+		       at:parseUnsigned([constant objectAtIndex:1])];
+    }
+    else {
+      addr = parseUnsigned([constant objectAtIndex:0]);
+      aString = [self labelForAddress:addr];
+      [self addLabel:aString at:addr];
+    }
+  }
+
+  return;
+}
+
+-(void) addEntryPoints:(CLString *) entryString
+{
+  CLArray *anArray;
+  int i, j;
+  CLString *aString;
+  CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
+  
+
+  if (access([entryString UTF8String], F_OK) == 0) {
+    aString = [CLString stringWithContentsOfFile:entryString encoding:CLUTF8StringEncoding];
+    entryString = aString;
+  }
+  
+  anArray = [entryString componentsSeparatedByCharactersInSet:sep];
+  for (i = 0, j = [anArray count]; i < j; i++) {
+    aString = [[anArray objectAtIndex:i] stringByTrimmingWhitespaceAndNewlines];
+    if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
+      continue;
+    
+    [entries addObject:[CLNumber numberWithUnsignedInt:
+				   parseUnsigned(aString)]];
   }
 
   return;
@@ -791,7 +731,7 @@ enum {
   return [CLString stringWithFormat:@"$%0*X", len, aValue];
 }
 
--(void) addSubroutine:(CLString *) label at:(CLUInteger) address
+-(void) addConstant:(CLString *) label at:(CLUInteger) address
 {
   CLNumber *anAddress;
 
@@ -802,10 +742,10 @@ enum {
   return;
 }
 
--(void) setSubroutines:(CLString *) aString
+-(void) setConstants:(CLString *) aString
 {
   int i;
-  subroutine *defsubs;
+  constant *defsubs;
 
   
   if (![aString caseInsensitiveCompare:@"vic20"])
@@ -813,9 +753,8 @@ enum {
   else
     defsubs = appleSubs;
 
-  subs = [[CLMutableDictionary alloc] init];
   for (i = 0; defsubs[i].label; i++)
-    [self addSubroutine:defsubs[i].label at:defsubs[i].address];
+    [self addConstant:defsubs[i].label at:defsubs[i].address];
   
   return;
 }

@@ -23,4 +23,4 @@
 typedef struct {
   CLUInteger address;
   CLString *label;
-} subroutine;
+} constant;

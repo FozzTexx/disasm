@@ -18,9 +18,9 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#import "subroutine.h"
+#import "constant.h"
 
-subroutine appleSubs[] = {
+constant appleSubs[] = {
   {0x3CA, @"DOS3UN1"},
   {0x3CD, @"DOS3UN2"},
   {0x3D6, @"DOS3IO"},

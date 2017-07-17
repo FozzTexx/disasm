@@ -18,33 +18,34 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#import "subroutine.h"
+#import "constant.h"
 
 #import <ClearLake/ClearLake.h>
 
 @interface Disassembler:CLObject
 {
-  CLUInteger origin, entry;
+  CLUInteger origin;
   CLData *binary;
-  CLMutableArray *stack;
+  CLMutableArray *stack, *entries;
   CLMutableDictionary *assembly, *labels, *subs;
 
   BOOL relativeLabels;
 }
 
 -(id) init;
--(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org entry:(CLUInteger) ent;
+-(id) initWithBinary:(CLData *) aData origin:(CLUInteger) org;
 -(void) dealloc;
 
 -(void) disassemble;
 
--(void) addLabels:(CLString *) aString;
+-(void) addLabels:(CLString *) labels;
+-(void) addEntryPoints:(CLString *) entries;
 
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len;
 
--(void) setSubroutines:(CLString *) aString;
+-(void) setConstants:(CLString *) aString;
 -(void) setRelativeLabels:(BOOL) flag;
 
--(void) addSubroutine:(CLString *) label at:(CLUInteger) address;
+-(void) addConstant:(CLString *) label at:(CLUInteger) address;
 
 @end
