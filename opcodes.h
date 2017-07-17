@@ -18,8 +18,6 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#define CSTYLE 0
-
 typedef enum {
   OpcodeRelative =	0x001,
   OpcodeImmediate =	0x002,

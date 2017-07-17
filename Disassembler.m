@@ -26,22 +26,6 @@
 
 #import "opcode6502.h"
 
-#if 0
-#if EPSON
-#define DUNNO1 0x589C
-#define INIBUF 0x5A0A
-#define FREBUF 0x5A49
-#define ZPSAVE 0x5A6F
-#define DUNNO2 0x5B0E
-#else
-#define DUNNO1 0x5952
-#define INIBUF 0x5AC0
-#define FREBUF 0x5AFF
-#define ZPSAVE 0x5B25
-#define DUNNO2 0x5BC4
-#endif
-#endif
-
 enum {
   ModeNone = 0,
   ModeString,
@@ -295,64 +279,6 @@ enum {
     
     if (oc->type & OpcodeBranch || oc->type & OpcodeCall) {
       [self pushStack:val];
-
-#if 0
-      /* FIXME - don't hardcode this in */
-      if (oc->type & OpcodeCall) {
-	switch (val) {
-	case DUNNO1:
-	  {
-	    int addrCount;
-
-
-	    addrCount = [self valueAt:progCounter + 2 length:1] + 1;
-
-	    progCounter += [self declareBytes:4 at:progCounter];
-
-	    for (; addrCount; addrCount--) {
-	      val = [self valueAt:progCounter length:2];
-	      if (val >= origin && val < [binary length] + origin)
-		[self pushStack:val];
-	      progCounter += [self declareWords:1 at:progCounter];
-	    }
-	  }
-	  break;
-	  
-	case INIBUF:
-	  val = [self valueAt:progCounter length:2];
-	  [self pushStack:val];
-	  progCounter += [self declareWords:1 at:progCounter];
-	  break;
-
-	case FREBUF:
-	  progCounter += [self declareBytes:1 at:progCounter];
-	  break;
-
-	case ZPSAVE:
-	  progCounter += [self declareBytes:1 at:progCounter];
-	  progCounter += [self declareWords:1 at:progCounter];
-	  break;
-
-	case DUNNO2:
-	  {
-	    int addrCount;
-
-
-	    addrCount = [self valueAt:progCounter length:1] * 2;
-	    
-	    progCounter += [self declareBytes:4 at:progCounter];
-
-	    for (; addrCount; addrCount--) {
-	      val = [self valueAt:progCounter length:2];
-	      if (val >= origin && val < [binary length] + origin)
-		[self pushStack:val];
-	      progCounter += [self declareWords:1 at:progCounter];
-	    }
-	  }
-	  break;
-	}
-      }
-#endif
     }
 
     if (oc->type & OpcodeJump) {
@@ -384,6 +310,7 @@ enum {
   [self addLabel:[self labelForAddress:start] at:start];
 
 #if 1
+  /* Create labels for things that look like addresses */
   for (si = 0; si < len - 1; si++) {
     val = [self valueAt:start + si length:2];
     anAddress = [CLNumber numberWithUnsignedInt:val];
@@ -391,6 +318,7 @@ enum {
     if (!aLabel && val >= origin && val < [binary length] + origin) {
       aLabel = [self labelForAddress:val];
       [self addLabel:aLabel at:val];
+      si++;
 
 #if 0
       asmAddress = [self assemblyWithAddress:anAddress];
@@ -413,6 +341,7 @@ enum {
       val = [self valueAt:start + si length:1];
       aLabel = nil;
 #if 1
+      /* Use labels for things that look like addresses */
       if (si < len - 1) {
 	dval = [self valueAt:start + si length:2];
 	anAddress = [CLNumber numberWithUnsignedInt:dval];
@@ -519,9 +448,6 @@ enum {
 
 
   asmObj = [assembly objectForKey:anAddress];
-#if 0
-  anAddress = [CLNumber numberWithUnsignedInt:[anAddress unsignedIntValue] + [asmObj length]];
-#endif
   anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, j = [anArray count]; i < j; i++) {
     asmAddress = [anArray objectAtIndex:i];
@@ -556,9 +482,6 @@ enum {
     anAddress = [CLNumber numberWithUnsignedInt:
 			    [anAddress unsignedIntValue] + [asmObj length]];
   }
-#if 0
-  fprintf(stderr, "%04x: %s\n", [start unsignedIntValue], [mString UTF8String]);
-#endif
 
   return [CLNumber numberWithUnsignedInt:[mString hash] & 0xffff];
 }
@@ -576,32 +499,10 @@ enum {
 
   
   [stack removeAllObjects];
+
+#if 1
+  /* FIXME - use command line options, don't hardcode this stuff */
   [stack addObject:[CLNumber numberWithUnsignedInt:entry]];
-#if 0
-  [stack addObject:[CLNumber numberWithUnsignedInt:entry + 16]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x233A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x2399]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x23E2]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x342A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x3440]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x345F]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x4011]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x407E]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x4B09]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x54B7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5539]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5594]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5622]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5870]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5923]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5940]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5AE7]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BD3]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5BF8]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C1B]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C6A]];
-  [stack addObject:[CLNumber numberWithUnsignedInt:0x5C99]];
-#else
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA02D]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA037]];
   [stack addObject:[CLNumber numberWithUnsignedInt:0xA079]];
@@ -744,17 +645,6 @@ enum {
     [pool release];
   }
 
-#if 0
-  anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
-  for (i = 0, j = [anArray count]; i < j; i++) {
-    num = [anArray objectAtIndex:i];
-    val = [num unsignedIntValue];
-    if (val >= origin && val < origin + [binary length] && ![assembly objectForKey:num]) {
-      [self declareDataFrom:[num unsignedIntValue] to:[num unsignedIntValue] + 1];
-    }
-  }
-#endif
-  
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
   for (i = 0, progCounter = origin, j = [anArray count]; i < j; i++) {
     num = [anArray objectAtIndex:i];
@@ -766,9 +656,6 @@ enum {
 
   if ([binary length] - progCounter)
     [self declareDataFrom:progCounter to:[binary length] + origin];
-
-  /* FIXME - make sure all labels within binary are pointing to
-     something by splitting data blocks */
 
   {
     CLNumber *anAddress, *asmAddress;
@@ -791,6 +678,9 @@ enum {
 	  [labels setObject:[self labelForAddress:[asmAddress unsignedIntValue]]
 		     forKey:asmAddress];
 #if 0	
+	/* FIXME - make sure all labels within binary are pointing to
+	   something by splitting data blocks */
+
 	fprintf(stderr, "Entry into existing block $%04x $%04x\n", val,
 		[asmAddress unsignedIntValue]);
 #endif
@@ -840,6 +730,8 @@ enum {
       [labels setObject:newLabel forKey:anAddress];
     }
   }
+
+  /* FIXME - reference count labels/constants and only print ones in use */
   
   printf("\tORG %s\n", [[self formatHex:origin length:4] UTF8String]);
   printf("\n");
@@ -896,11 +788,7 @@ enum {
 
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len
 {
-#if CSTYLE
-  return [CLString stringWithFormat:@"0x%0*X", len, aValue];
-#else
   return [CLString stringWithFormat:@"$%0*X", len, aValue];
-#endif
 }
 
 -(void) addSubroutine:(CLString *) label at:(CLUInteger) address

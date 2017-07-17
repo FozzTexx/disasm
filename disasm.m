@@ -45,6 +45,15 @@ int main(int argc, char *argv[])
 
   count = CLGetArgs(argc, argv, @"osesls", &org, &ent, &labels);
 
+  /* FIXME - allow defining constants (EQU) */
+  /* FIXME - allow defining labels for specific addresses */
+  /* FIXME - allow setting multiple entry points */
+  /* FIXME - allow declaring data blocks and type: binary, string, word */
+  /* FIXME - option to disable/enable looking for addresses in data */
+  /* FIXME - option to disable/enable looking for strings in data */
+  /* FIXME - option to disable/enable printing address as comment */
+  /* FIXME - option to disable/enable hashed labels */
+  
   if (count < 0 || (argc - count) != 1) {
     if (count < 0 && -count != '-')
       fprintf(stderr, "Bad flag: %c\n", -count);
