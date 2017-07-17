@@ -668,10 +668,6 @@ enum {
       addr = 0xace6;
       addr2 = 0xad00;
       [self declareBytes:addr2 - addr at:addr];
-      [self addLabel:[self labelForAddress:addr2] at:addr2];
-      addr = addr2;
-      addr2 = 0xafb7;
-      [self declareBytes:addr2 - addr at:addr];
       [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
       [self addLabel:[self labelForAddress:addr2] at:addr2];
       //[self declareWords:1 at:0xacfd + 3];
@@ -727,10 +723,6 @@ enum {
 
       addr = 0xacfb;
       addr2 = 0xad00;
-      [self declareBytes:addr2 - addr at:addr];
-      [self addLabel:[self labelForAddress:addr2] at:addr2];
-      addr = addr2;
-      addr2 = 0xafb7;
       [self declareBytes:addr2 - addr at:addr];
       [self declareBytes:origin + [binary length] - addr2 - 1 at:addr2];
       [self addLabel:[self labelForAddress:addr2] at:addr2];
