@@ -654,7 +654,7 @@ enum {
     if (i && [asmObj isEntryPoint])
       printf("\n");
     label = [labels objectForKey:num];
-    if (label && ![refCount objectForKey:label])
+    if (label && ![refCount objectForKey:label] && ![subs objectForKey:num])
       label = nil;
     label = [label stringByAppendingString:@":"];
     printf("%s\t%s", label ? [label UTF8String] : "",
