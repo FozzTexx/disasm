@@ -500,6 +500,7 @@ enum {
   Assembly *asmObj;
   CLNumber *num;
   CLString *label;
+  CLMutableDictionary *refCount;
 
   
   [stack removeAllObjects];
@@ -600,7 +601,31 @@ enum {
     }
   }
 
-  /* FIXME - reference count labels/constants and only print ones in use */
+  {
+    CLNumber *num;
+    Assembly *asmObj;
+    CLUInteger count;
+    CLString *label;
+    CLRange aRange;
+
+    
+    refCount = [CLMutableDictionary dictionary];
+    
+    anArray = [assembly allValues];
+    for (i = 0, j = [anArray count]; i < j; i++) {
+      asmObj = [anArray objectAtIndex:i];
+      if ([asmObj length] > 1 && !([asmObj type] & OpcodeImmediate)) {
+	num = [CLNumber numberWithUnsignedInt:[asmObj value]];
+	if ((label = [labels objectForKey:num])) {
+	  aRange = [label rangeOfString:@"+"];
+	  if (aRange.length)
+	    label = [label substringToIndex:aRange.location];
+	  count = [[refCount objectForKey:label] unsignedIntValue] + 1;
+	  [refCount setObject:[CLNumber numberWithUnsignedInt:count] forKey:label];
+	}
+      }
+    }
+  }
   
   printf("\tORG %s\n", [[self formatHex:origin length:4] UTF8String]);
   printf("\n");
@@ -614,8 +639,10 @@ enum {
     [mArray removeObjectsInArray:[assembly allKeys]];
     for (i = 0, j = [mArray count]; i < j; i++) {
       anAddress = [mArray objectAtIndex:i];
-      printf("%s\tEQU %s\n", [[subs objectForKey:anAddress] UTF8String],
-	     [[self formatHex:[anAddress unsignedIntValue] length:4] UTF8String]);
+      label = [subs objectForKey:anAddress];
+      if ([refCount objectForKey:label])
+	printf("%s\tEQU %s\n", [label UTF8String],
+	       [[self formatHex:[anAddress unsignedIntValue] length:4] UTF8String]);
     }
     printf("\n");
   }
@@ -626,7 +653,10 @@ enum {
     asmObj = [assembly objectForKey:num];
     if (i && [asmObj isEntryPoint])
       printf("\n");
-    label = [[labels objectForKey:num] stringByAppendingString:@":"];
+    label = [labels objectForKey:num];
+    if (label && ![refCount objectForKey:label])
+      label = nil;
+    label = [label stringByAppendingString:@":"];
     printf("%s\t%s", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
 #if 1
