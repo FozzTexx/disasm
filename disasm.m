@@ -40,17 +40,17 @@ int main(int argc, char *argv[])
   CLData *aData;
   Disassembler *disasm;
   CLAutoreleasePool *pool;
+  BOOL hashedLabels = NO;
 
 
   pool = [[CLAutoreleasePool alloc] init];
 
-  count = CLGetArgs(argc, argv, @"oseslsds", &org, &entry, &labels, &data);
+  count = CLGetArgs(argc, argv, @"oseslsdshb", &org, &entry, &labels, &data, &hashedLabels);
 
   /* FIXME - allow declaring data blocks and type: binary, string, word */
   /* FIXME - option to disable/enable looking for addresses in data */
   /* FIXME - option to disable/enable looking for strings in data */
   /* FIXME - option to disable/enable printing address as comment */
-  /* FIXME - option to disable/enable hashed labels */
   
   if (count < 0 || (argc - count) != 1) {
     if (count < 0 && -count != '-')
@@ -62,6 +62,7 @@ int main(int argc, char *argv[])
 	    "\tl: create label for address(es), separate by commas or file with separate lines\n"
 	    "\td: declare data blocks at ranges, use /A or /W for words\n"
 	    "\ts: subroutine type (apple, vic20)\n"
+	    "\th: using hashing of code blocks to generate labels\n"
 	    , *argv);
     exit(1);
   }
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
 
   disasm = [[Disassembler alloc] initWithBinary:aData origin:origin];
   [disasm setConstants:@"vic20"];
-  //[disasm setRelativeLabels:YES];
+  [disasm setHashedLabels:hashedLabels];
   [disasm addLabels:labels];
   [disasm addEntryPoints:entry];
   [disasm addDataBlocks:data];

@@ -75,8 +75,13 @@ enum {
 
   num = [CLNumber numberWithUnsignedInt:address];
   if (address < origin || address >= [binary length] + origin) {
-    if (![labels objectForKey:num])
+    if (![labels objectForKey:num]) {
+#if 1
+      fprintf(stderr, "Trying to disassemble outside of program: %04X\n", address);
+      return;
+#endif
       [self error:@"Trying to disassemble outside of program: %04X", address];
+    }
     return;
   }
   
@@ -163,18 +168,7 @@ enum {
 
   aLabel = [labels objectForKey:[CLNumber numberWithUnsignedInt:address]];
   if (!aLabel) {
-#if 0
-    if (relativeLabels) {
-      uint16_t offset;
-
-      
-      offset = address;
-      offset -= entry;
-      aLabel = [CLString stringWithFormat:@"R%04X", offset];
-    }
-    else
-#endif
-      aLabel = [CLString stringWithFormat:@"L%04X", address];
+    aLabel = [CLString stringWithFormat:@"L%04X", address];
   }
 
   return aLabel;
@@ -232,7 +226,7 @@ enum {
     oc = &opcodes[instr];
 
     if ([oc->mnem isEqualToString:@"BRK"] || !oc->mnem) {
-#if 0
+#if 1
       fprintf(stderr, "Unlikely: %04X $%02X\n", progCounter, oc->code);
       return;
 #endif
@@ -557,7 +551,8 @@ enum {
     }
   }
 
-  {
+
+  if (hashedLabels) {
     CLNumber *anAddress, *hash;
     CLString *newLabel, *oldLabel;
     CLMutableDictionary *remap, *remap2;
@@ -659,10 +654,8 @@ enum {
     label = [label stringByAppendingString:@":"];
     printf("%s\t%s", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
-#if 1
-    if (label)
+    if (label && hashedLabels)
       printf("\t; $%04X", [[anArray objectAtIndex:i] unsignedIntValue]);
-#endif
     printf("\n");
   }
   
@@ -816,9 +809,9 @@ enum {
   return;
 }
 
--(void) setRelativeLabels:(BOOL) flag
+-(void) setHashedLabels:(BOOL) flag
 {
-  relativeLabels = flag;
+  hashedLabels = flag;
   return;
 }
 

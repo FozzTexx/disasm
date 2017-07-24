@@ -29,7 +29,7 @@
   CLMutableArray *stack, *entries;
   CLMutableDictionary *assembly, *labels, *subs;
 
-  BOOL relativeLabels;
+  BOOL hashedLabels;
 }
 
 -(id) init;
@@ -45,7 +45,7 @@
 -(CLString *) formatHex:(CLUInteger) aValue length:(CLUInteger) len;
 
 -(void) setConstants:(CLString *) aString;
--(void) setRelativeLabels:(BOOL) flag;
+-(void) setHashedLabels:(BOOL) flag;
 
 -(void) addConstant:(CLString *) label at:(CLUInteger) address;
 
