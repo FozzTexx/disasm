@@ -27,7 +27,7 @@
   CLUInteger origin;
   CLData *binary;
   CLMutableArray *stack, *entries;
-  CLMutableDictionary *assembly, *labels, *subs;
+  CLMutableDictionary *assembly, *labels, *subs, *subArgs;
 
   BOOL hashedLabels;
 }
@@ -37,6 +37,11 @@
 -(void) dealloc;
 
 -(void) disassemble;
+
+-(CLUInteger) valueAt:(CLUInteger) address length:(CLUInteger) length;
+-(CLUInteger) declareBytes:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
+-(CLUInteger) declareString:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
+-(CLUInteger) declareWords:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
 
 -(void) addLabels:(CLString *) labels;
 -(void) addEntryPoints:(CLString *) entries;

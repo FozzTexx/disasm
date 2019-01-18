@@ -25,16 +25,18 @@
 
 -(id) init
 {
-  return [self initFromString:nil value:0 length:0 entryPoint:NO type:0];
+  return [self initFromString:nil value:0 length:0 entryPoint:NO type:0 forced:NO];
 }
 
 -(id) initFromString:(CLString *) aString value:(CLUInteger) aValue
-	      length:(int) aLength entryPoint:(BOOL) flag type:(OpcodeType) aType;
+	      length:(int) aLength entryPoint:(BOOL) entryFlag type:(OpcodeType) aType
+	      forced:(BOOL) forcedFlag
 {
   [super init];
   line = [aString copy];
   len = aLength;
-  entryPoint = flag;
+  entryPoint = entryFlag;
+  forced = forcedFlag;
   value = aValue;
   type = aType;
   return self;
@@ -96,6 +98,11 @@
 -(OpcodeType) type
 {
   return type;
+}
+
+-(BOOL) isForced
+{
+  return forced;
 }
 
 @end

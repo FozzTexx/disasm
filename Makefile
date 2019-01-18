@@ -2,7 +2,7 @@ PRODUCT=        disasm
 # If PRODUCT= line is missing, be sure to insert one
 # $(PRODUCT).c will be automatically compiled, so it
 # doesn't need to be inserted below
-CLASSES= Disassembler.m Assembly.m Data.m
+CLASSES= Disassembler.m Assembly.m Data.m SubroutineArguments.m
 CFILES=
 MFILES= $(PRODUCT).m
 CFLAGS= -g -Wall -Wno-import -I$(HOME)/Unix/$(OSTYPE)/include \

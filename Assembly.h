@@ -26,15 +26,16 @@
 @interface Assembly:CLObject
 {
   CLUInteger len;
-  BOOL entryPoint;
+  BOOL entryPoint, forced;
   CLString *line;
   CLUInteger value;
   OpcodeType type;
 }
 
 -(id) init;
--(id) initFromString:(CLString *) aString value:(CLUInteger) addr
-	      length:(int) aValue entryPoint:(BOOL) flag type:(OpcodeType) aType;
+-(id) initFromString:(CLString *) aString value:(CLUInteger) aValue
+	      length:(int) aLength entryPoint:(BOOL) entryFlag type:(OpcodeType) aType
+	      forced:(BOOL) forcedFlag;
 -(void) dealloc;
 
 -(CLString *) line;
@@ -43,5 +44,6 @@
 -(CLUInteger) length;
 -(BOOL) isEntryPoint;
 -(OpcodeType) type;
+-(BOOL) isForced;
 
 @end

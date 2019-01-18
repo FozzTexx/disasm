@@ -20,6 +20,7 @@
 
 #import "Disassembler.h"
 #import "Assembly.h"
+#import "SubroutineArguments.h"
 #import "AppleLabels.h"
 #import "VIC20Labels.h"
 #import "disasm.h"
@@ -52,6 +53,7 @@ enum {
   labels = [[CLMutableDictionary alloc] init];
   entries = [[CLMutableArray alloc] init];
   subs = [[CLMutableDictionary alloc] init];
+  subArgs = [[CLMutableDictionary alloc] init];
 
   return self;
 }
@@ -64,6 +66,7 @@ enum {
   [labels release];
   [entries release];
   [subs release];
+  [subArgs release];
   [super dealloc];
   return;
 }
@@ -92,14 +95,15 @@ enum {
 }
 
 -(void) addAssembly:(CLString *) line value:(CLUInteger) target
-	     length:(CLUInteger) len entryPoint:(BOOL) flag
+	     length:(CLUInteger) len entryPoint:(BOOL) entryFlag
 		 at:(CLUInteger) address type:(OpcodeType) type
+	     forced:(BOOL) forcedFlag
 {
   Assembly *asmObj;
 
 
-  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:flag
-				       type:type];
+  asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:entryFlag
+				       type:type forced:forcedFlag];
   [assembly setObject:asmObj forKey:[CLNumber numberWithUnsignedInt:address]];
   [asmObj release];
 }
@@ -120,7 +124,7 @@ enum {
   return val;
 }
 
--(CLUInteger) declareBytes:(CLUInteger) len at:(CLUInteger) address
+-(CLUInteger) declareBytes:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced
 {
   CLMutableString *mString;
   int i, b;
@@ -134,19 +138,54 @@ enum {
 	  [self formatHex:[self valueAt:address + i length:1] length:2]];
     if (b == 9) {
       [self addAssembly:mString value:0 length:b + 1 entryPoint:NO at:address + i - b
-		   type:OpcodeConst];
+		   type:OpcodeConst forced:forced];
       b = -1;
       [mString setString:@"byt"];
     }
   }
   if (b)
     [self addAssembly:mString value:0 length:b entryPoint:NO at:address + i - b
-		 type:OpcodeConst];
+		 type:OpcodeConst forced:forced];
 
   return len;
 }
 
--(CLUInteger) declareWords:(CLUInteger) len at:(CLUInteger) address
+-(CLUInteger) declareString:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced
+{
+  CLMutableString *mString;
+  int i, b;
+  CLUInteger val;
+  
+
+  mString = [CLMutableString stringWithFormat:@"byt \""];
+  for (i = b = 0; i < len; i++, b++) {
+    if (b == 40) {
+      [mString appendString:@"\""];
+      [self addAssembly:mString value:0 length:b entryPoint:NO at:address + i - b
+		   type:OpcodeConst forced:forced];
+      [mString setString:@"byt \""];
+      b = 0;
+    }
+
+    val = [self valueAt:address + i length:1];
+    if (val < 32 || val > 126)
+      [mString appendFormat:@"\\x%02x", val];
+    else if (val == '\'')
+      [mString appendFormat:@"\\'"];
+    else if (val == '"')
+      [mString appendFormat:@"\\\""];
+    else
+      [mString appendFormat:@"%c", val];
+  }
+  [mString appendString:@"\""];
+  if (b)
+    [self addAssembly:mString value:0 length:b entryPoint:NO at:address + i - b
+		 type:OpcodeConst forced:forced];
+
+  return len;
+}
+
+-(CLUInteger) declareWords:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced
 {
   int i;
   CLUInteger val;
@@ -155,7 +194,7 @@ enum {
   for (i = 0; i < len; i++, address += 2) {
     val = [self valueAt:address length:2];
     [self addAssembly:@"adr %@" value:val length:2 entryPoint:NO at:address
-		 type:OpcodeConst];
+		 type:OpcodeConst forced:forced];
   }
 
   return len * 2;
@@ -213,6 +252,8 @@ enum {
   CLUInteger progCounter, val, instr, len;
   opcode *oc;
   CLString *label;
+  CLNumber *anAddress;
+  Assembly *asmObj;
 
 
   progCounter = start;
@@ -222,6 +263,13 @@ enum {
     if (progCounter < origin || progCounter >= [binary length] + origin)
       [self error:@"Trying to disassemble outside of program"];
 
+    anAddress = [CLNumber numberWithUnsignedInt:progCounter];
+    asmObj = [assembly objectForKey:anAddress];
+    if ([asmObj type] == OpcodeConst && [asmObj isForced]) {
+      progCounter += [asmObj length];
+      continue;
+    }
+    
     instr = [self valueAt:progCounter length:1];
     oc = &opcodes[instr];
 
@@ -269,18 +317,29 @@ enum {
       if ([nearest compare:anAddress]) {
 	len = [anAddress unsignedIntValue] - [nearest unsignedIntValue];
 	[assembly removeObjectForKey:nearest];
-	[self declareBytes:len at:[nearest unsignedIntValue]];
+	[self declareBytes:len at:[nearest unsignedIntValue] forced:NO];
 	asmObj = nil;
       }
       if (!asmObj)
 	[self addAssembly:oc->mnem value:val length:oc->length
-	       entryPoint:progCounter == start at:progCounter type:oc->type];
+	       entryPoint:progCounter == start at:progCounter type:oc->type forced:NO];
     }
 
     progCounter += oc->length;
     
     if (oc->type & OpcodeBranch || oc->type & OpcodeCall) {
       [self pushStack:val];
+
+      if (oc->type & OpcodeCall) {
+	SubroutineArguments *args;
+
+
+	args = [subArgs objectForKey:[CLNumber numberWithUnsignedInt:val]];
+	if (args) {
+	  len = [args declareArguments:self at:progCounter];
+	  progCounter += len;
+	}
+      }
     }
 
     if (oc->type & OpcodeJump) {
@@ -297,7 +356,7 @@ enum {
 
 -(void) declareDataFrom:(CLUInteger) start to:(CLUInteger) end
 {
-  CLUInteger len = end - start;
+  CLInteger len = end - start;
   int i, j, b, val, dval, si, mode;
   CLMutableString *mString;
   CLString *aLabel;
@@ -311,7 +370,7 @@ enum {
 
   [self addLabel:[self labelForAddress:start] at:start];
 
-#if 1
+#if 1 /* FIXME - make a command line flag */
   /* Create labels for things that look like addresses */
   for (si = 0; si < len - 1; si++) {
     val = [self valueAt:start + si length:2];
@@ -354,14 +413,14 @@ enum {
 	if (si - i)
 	  break;
 
-	[self declareWords:1 at:start + si];
+	[self declareWords:1 at:start + si forced:NO];
 	si += 2;
 	i += 2;
 	break;
       }
 #endif
 
-#if 0
+#if 1
       if (val >= ' ' && val <= '~') {
 	if (mode == ModeBinary)
 	  break;
@@ -387,14 +446,14 @@ enum {
 		[self formatHex:[self valueAt:start + j length:1] length:2]];
 	  if (b == 9) {
 	    [self addAssembly:mString value:0 length:b + 1 entryPoint:NO
-			   at:start + j - b type:OpcodeConst];
+			   at:start + j - b type:OpcodeConst forced:NO];
 	    b = -1;
 	    [mString setString:@"byt"];
 	  }
 	}
 	if (b)
 	  [self addAssembly:mString value:0 length:b entryPoint:NO at:start + j - b
-		       type:OpcodeConst];
+		       type:OpcodeConst forced:NO];
       }
       else {
 	[mString setString:@"byt \""];
@@ -409,7 +468,7 @@ enum {
 	}
 	[mString appendString:@"\""];
 	[self addAssembly:mString value:0 length:si - i entryPoint:NO at:start + i
-		     type:OpcodeConst];
+		     type:OpcodeConst forced:NO];
       }
     }
 
@@ -649,8 +708,10 @@ enum {
     if (i && [asmObj isEntryPoint])
       printf("\n");
     label = [labels objectForKey:num];
+#if 0
     if (label && ![refCount objectForKey:label] && ![subs objectForKey:num])
       label = nil;
+#endif
     label = [label stringByAppendingString:@":"];
     printf("%s\t%s", label ? [label UTF8String] : "",
 	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
@@ -666,11 +727,15 @@ enum {
 {
   CLArray *anArray, *constant;
   int i, j;
-  CLString *aString;
+  CLString *aString, *types;
   CLUInteger addr;
   CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
+  CLRange aRange;
+  SubroutineArguments *args;
   
 
+  /* FIXME - allow setting comments */
+  
   if (access([labelString UTF8String], F_OK) == 0) {
     aString = [CLString stringWithContentsOfFile:labelString encoding:CLUTF8StringEncoding];
     labelString = aString;
@@ -681,16 +746,32 @@ enum {
     aString = [[anArray objectAtIndex:i] stringByTrimmingWhitespaceAndNewlines];
     if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
       continue;
-    
+
+    aRange = [aString rangeOfString:@"/"];
+    types = nil;
+    if (aRange.length) {
+      types = [[aString substringFromIndex:CLMaxRange(aRange)]
+		stringByTrimmingWhitespaceAndNewlines];
+      aString = [[aString substringToIndex:aRange.location]
+		  stringByTrimmingWhitespaceAndNewlines];
+    }
+
     constant = [aString componentsSeparatedByString:@"="];
     if ([constant count] > 1) {
+      addr = parseUnsigned([constant objectAtIndex:1]);
       [self addConstant:[[constant objectAtIndex:0] stringByTrimmingWhitespaceAndNewlines]
-		       at:parseUnsigned([constant objectAtIndex:1])];
+		       at:addr];
     }
     else {
       addr = parseUnsigned([constant objectAtIndex:0]);
       aString = [self labelForAddress:addr];
       [self addLabel:aString at:addr];
+    }
+
+    if (types) {
+      args = [[SubroutineArguments alloc] initFromString:types];
+      [subArgs setObject:args forKey:[CLNumber numberWithUnsignedInt:addr]];
+      [args release];
     }
   }
 
@@ -701,10 +782,15 @@ enum {
 {
   CLArray *anArray;
   int i, j;
-  CLString *aString;
+  CLString *aString, *types;
   CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
+  CLRange aRange;
+  CLNumber *addr;
+  SubroutineArguments *args;
   
 
+  /* FIXME - allow setting comments */
+  
   if (access([entryString UTF8String], F_OK) == 0) {
     aString = [CLString stringWithContentsOfFile:entryString encoding:CLUTF8StringEncoding];
     entryString = aString;
@@ -715,9 +801,23 @@ enum {
     aString = [[anArray objectAtIndex:i] stringByTrimmingWhitespaceAndNewlines];
     if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
       continue;
-    
-    [entries addObject:[CLNumber numberWithUnsignedInt:
-				   parseUnsigned(aString)]];
+
+    aRange = [aString rangeOfString:@"/"];
+    types = nil;
+    if (aRange.length) {
+      types = [[aString substringFromIndex:CLMaxRange(aRange)]
+		stringByTrimmingWhitespaceAndNewlines];
+      aString = [[aString substringToIndex:aRange.location]
+		  stringByTrimmingWhitespaceAndNewlines];
+    }
+
+    addr = [CLNumber numberWithUnsignedInt:parseUnsigned(aString)];
+    [entries addObject:addr];
+    if (types) {
+      args = [[SubroutineArguments alloc] initFromString:types];
+      [subArgs setObject:args forKey:addr];
+      [args release];
+    }
   }
 
   return;
@@ -733,6 +833,8 @@ enum {
   CLUInteger begin, end;
   
 
+  /* FIXME - allow setting comments */
+  
   if (access([blockString UTF8String], F_OK) == 0) {
     aString = [CLString stringWithContentsOfFile:blockString encoding:CLUTF8StringEncoding];
     blockString = aString;
@@ -752,7 +854,7 @@ enum {
 	       characterAtIndex:0];
       aString = [aString substringToIndex:aRange.location];
     }
-    aRange = [aString rangeOfString:@"-"];
+    aRange = [aString rangeOfString:@":"];
     if (aRange.length) {
       begin = parseUnsigned([[aString substringToIndex:aRange.location]
 			      stringByTrimmingWhitespaceAndNewlines]);
@@ -760,16 +862,24 @@ enum {
 			      stringByTrimmingWhitespaceAndNewlines]);
     }
     else 
-      begin = end = parseUnsigned([[aString substringToIndex:aRange.location]
-				    stringByTrimmingWhitespaceAndNewlines]);
+      begin = end = parseUnsigned([aString stringByTrimmingWhitespaceAndNewlines]);
 
     if (type == 'A' || type == 'W') {
-      len = (end - begin + 1) / 2;
-      [self declareWords:len at:begin];
+      len = (end - begin + 2) / 2;
+      [self declareWords:len at:begin forced:YES];
+    }
+    else if (type == 'C') {
+      for (; [self valueAt:end length:1]; end++)
+	;
+      len = end - begin + 1;
+      [self declareString:len at:begin forced:YES];
     }
     else {
-      len = end - begin;
-      [self declareBytes:len at:begin];
+      len = end - begin + 1;
+      if (type == 'S')
+	[self declareString:len at:begin forced:YES];
+      else
+	[self declareBytes:len at:begin forced:YES];
     }
   }
 
@@ -798,7 +908,7 @@ enum {
   constant *defsubs;
 
   
-  if (![aString caseInsensitiveCompare:@"vic20"])
+  if (aString && ![aString caseInsensitiveCompare:@"vic20"])
     defsubs = vic20Subs;
   else
     defsubs = appleSubs;

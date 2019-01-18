@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
 {
   int count;
   CLString *org = nil, *entry = nil, *labels = nil, *data = nil;
+  CLString *subs = nil;
   CLUInteger origin = 0;
   CLData *aData;
   Disassembler *disasm;
@@ -45,9 +46,9 @@ int main(int argc, char *argv[])
 
   pool = [[CLAutoreleasePool alloc] init];
 
-  count = CLGetArgs(argc, argv, @"oseslsdshb", &org, &entry, &labels, &data, &hashedLabels);
+  count = CLGetArgs(argc, argv, @"oseslsdshbss", &org, &entry, &labels, &data,
+		    &hashedLabels, &subs);
 
-  /* FIXME - allow declaring data blocks and type: binary, string, word */
   /* FIXME - option to disable/enable looking for addresses in data */
   /* FIXME - option to disable/enable looking for strings in data */
   /* FIXME - option to disable/enable printing address as comment */
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
   aData = [CLData dataWithContentsOfFile:[CLString stringWithUTF8String:argv[count]]];
 
   disasm = [[Disassembler alloc] initWithBinary:aData origin:origin];
-  [disasm setConstants:@"vic20"];
+  [disasm setConstants:subs];
   [disasm setHashedLabels:hashedLabels];
   [disasm addLabels:labels];
   [disasm addEntryPoints:entry];
