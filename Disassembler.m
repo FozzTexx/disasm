@@ -100,8 +100,13 @@ enum {
 	     forced:(BOOL) forcedFlag
 {
   Assembly *asmObj;
+  CLNumber *nearest;
 
 
+  nearest = [self assemblyWithAddress:[CLNumber numberWithUnsignedInt:address] length:len];
+  if (nearest)
+    [self error:@"Already have something there! %04X %04X", address,
+	  [nearest unsignedIntValue]];
   asmObj = [[Assembly alloc] initFromString:line value:target length:len entryPoint:entryFlag
 				       type:type forced:forcedFlag];
   [assembly setObject:asmObj forKey:[CLNumber numberWithUnsignedInt:address]];
@@ -223,24 +228,29 @@ enum {
   return;
 }
 
--(CLNumber *) assemblyWithAddress:(CLNumber *) anAddress
+-(CLNumber *) assemblyWithAddress:(CLNumber *) anAddress length:(CLUInteger) len
 {
   CLArray *anArray;
   int i, j;
   Assembly *asmObj;
   CLNumber *asmAddress;
+  CLUInteger a1, a2, a3, a4;
 
   
   anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
+  a1 = [anAddress unsignedIntValue];
+  a2 = a1 + len;
   for (i = 0, j = [anArray count]; i < j; i++) {
-    if ([((CLNumber *) [anArray objectAtIndex:i]) compare:anAddress] > 0)
+    if ([((CLNumber *) [anArray objectAtIndex:i]) unsignedIntValue] > a2)
       break;
   }
 
   if (i) {
     asmAddress = [anArray objectAtIndex:i-1];
     asmObj = [assembly objectForKey:asmAddress];
-    if ([asmObj length] + [asmAddress unsignedIntValue] > [anAddress unsignedIntValue])
+    a3 = [asmAddress unsignedIntValue];
+    a4 = a3 + [asmObj length];
+    if (a4 > a1 && a3 < a2)
       return asmAddress;
   }
 
@@ -265,7 +275,10 @@ enum {
 
     anAddress = [CLNumber numberWithUnsignedInt:progCounter];
     asmObj = [assembly objectForKey:anAddress];
-    if ([asmObj type] == OpcodeConst && [asmObj isForced]) {
+    if ([asmObj type] & OpcodeJump)
+      return;
+    
+    if (asmObj) {
       progCounter += [asmObj length];
       continue;
     }
@@ -312,7 +325,7 @@ enum {
 
 
       anAddress = [CLNumber numberWithUnsignedInt:progCounter];
-      nearest = [self assemblyWithAddress:anAddress];
+      nearest = [self assemblyWithAddress:anAddress length:oc->length];
       asmObj = [assembly objectForKey:nearest];
       if ([nearest compare:anAddress]) {
 	len = [anAddress unsignedIntValue] - [nearest unsignedIntValue];
@@ -382,7 +395,7 @@ enum {
       si++;
 
 #if 0
-      asmAddress = [self assemblyWithAddress:anAddress];
+      asmAddress = [self assemblyWithAddress:anAddress length:si];
       if ([asmAddress compare:anAddress]) {
 	asmObj = [assembly objectForKey:asmAddress];
 	fprintf(stderr, "Entry into existing block $%04x $%04x\n", val,
@@ -582,6 +595,21 @@ enum {
     [self declareDataFrom:progCounter to:[binary length] + origin];
 
   {
+    CLNumber *addr;
+    CLUInteger address, end;
+
+
+    end = [binary length] + origin;
+    anArray = [labels allKeys];
+    for (i = [anArray count] - 1; i >= 0; i--) {
+      addr = [anArray objectAtIndex:i];
+      address = [addr unsignedIntValue];
+      if (address >= origin && address < end && ![assembly objectForKey:addr])
+	[labels removeObjectForKey:addr];
+    }
+  }
+  
+  {
     CLNumber *anAddress, *asmAddress;
     CLString *newLabel;
 
@@ -589,7 +617,7 @@ enum {
     anArray = [[labels allKeys] sortedArrayUsingSelector:@selector(compare:)];
     for (i = 0, j = [anArray count]; i < j; i++) {
       anAddress = [anArray objectAtIndex:i];
-      asmAddress = [self assemblyWithAddress:anAddress];
+      asmAddress = [self assemblyWithAddress:anAddress length:1];
       if ([asmAddress compare:anAddress]) {
 	asmObj = [assembly objectForKey:asmAddress];
 	newLabel = [CLString stringWithFormat:@"%@+%i",
@@ -609,7 +637,6 @@ enum {
       }
     }
   }
-
 
   if (hashedLabels) {
     CLNumber *anAddress, *hash;
@@ -680,7 +707,7 @@ enum {
       }
     }
   }
-  
+
   printf("\tORG %s\n", [[self formatHex:origin length:4] UTF8String]);
   printf("\n");
 

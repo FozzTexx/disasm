@@ -42,6 +42,7 @@
 -(CLUInteger) declareBytes:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
 -(CLUInteger) declareString:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
 -(CLUInteger) declareWords:(CLUInteger) len at:(CLUInteger) address forced:(BOOL) forced;
+-(CLNumber *) assemblyWithAddress:(CLNumber *) anAddress length:(CLUInteger) len;
 
 -(void) addLabels:(CLString *) labels;
 -(void) addEntryPoints:(CLString *) entries;
