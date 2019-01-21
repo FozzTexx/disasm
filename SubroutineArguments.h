@@ -1,4 +1,4 @@
-/* Copyright 2016 by Chris Osborn <fozztexx@fozztexx.com>
+/* Copyright 2019 by Chris Osborn <fozztexx@fozztexx.com>
  * http://insentricity.com
  *
  * This file is part of disasm.
@@ -18,32 +18,19 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#import "constant.h"
+#import <ClearLake/ClearLake.h>
 
-constant appleSubs[] = {
-  {0x3CA, @"DOS3UN1"},
-  {0x3CD, @"DOS3UN2"},
-  {0x3D6, @"DOS3IO"},
-  {0x3DC, @"DOS3SYS"},
-  {0x3F2, @"SOFTEV"},
-  {0xAA66, @"DOSVOL"},
-  {0xC000, @"KBD"},
-  {0xC010, @"KBDSTB"},
-  {0xE000, @"BASIC"},
-  {0xFB2F, @"INIT"},
-  {0xFB39, @"SETTXT"},
-  {0xFB5B, @"TABV"},
-  {0xFBB3, @"SYSID1"},
-  {0xFBC0, @"SYSID2"},
-  {0xFC58, @"HOME"},
-  {0xFC9C, @"CLREOL"},
-  {0xFE89, @"SETKBD"},
-  {0xFE93, @"SETVID"},
-  {0xFCA8, @"WAIT"},
-  {0xFD0C, @"RDKEY"},
-  {0xFDDA, @"PRNACC"},
-  {0xFDED, @"COUT"},
-  {0xFDF0, @"COUT1"},
-  {0xFE84, @"SETNORM"},
-  {0, nil},
-};
+@class Disassembler;
+
+@interface SubroutineArguments:CLObject
+{
+  CLString *args;
+}
+
+-(id) init;
+-(id) initFromString:(CLString *) aString;
+-(void) dealloc;
+
+-(CLUInteger) declareArguments:(Disassembler *) disasm at:(CLUInteger) address;
+
+@end

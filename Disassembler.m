@@ -852,7 +852,7 @@ enum {
 
 -(void) addDataBlocks:(CLString *) blockString
 {
-  CLArray *anArray;
+  CLArray *anArray, *constant;
   int i, j, type, len;
   CLString *aString;
   CLCharacterSet *sep = [CLCharacterSet characterSetWithCharactersInString:@",\n"];
@@ -873,6 +873,14 @@ enum {
     if (![aString length] || [aString hasPrefix:@";"] || [aString hasPrefix:@"#"])
       continue;
 
+    constant = [aString componentsSeparatedByString:@"="];
+    if ([constant count] > 1) {
+      begin = parseUnsigned([constant objectAtIndex:1]);
+      [self addConstant:[[constant objectAtIndex:0] stringByTrimmingWhitespaceAndNewlines]
+		     at:begin];
+      aString = [constant objectAtIndex:1];
+    }
+
     type = 0;
     aRange = [aString rangeOfString:@"/"];
     if (aRange.length) {
@@ -881,7 +889,7 @@ enum {
 	       characterAtIndex:0];
       aString = [aString substringToIndex:aRange.location];
     }
-    aRange = [aString rangeOfString:@":"];
+    aRange = [aString rangeOfString:@"."];
     if (aRange.length) {
       begin = parseUnsigned([[aString substringToIndex:aRange.location]
 			      stringByTrimmingWhitespaceAndNewlines]);
