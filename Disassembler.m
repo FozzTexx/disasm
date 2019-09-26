@@ -28,6 +28,7 @@
 #import "opcode6502.h"
 
 #include <unistd.h>
+#include <string.h>
 
 enum {
   ModeNone = 0,
@@ -241,7 +242,7 @@ enum {
   a1 = [anAddress unsignedIntValue];
   a2 = a1 + len;
   for (i = 0, j = [anArray count]; i < j; i++) {
-    if ([((CLNumber *) [anArray objectAtIndex:i]) unsignedIntValue] > a2)
+    if ([((CLNumber *) [anArray objectAtIndex:i]) unsignedIntValue] >= a2)
       break;
   }
 
@@ -264,6 +265,7 @@ enum {
   CLString *label;
   CLNumber *anAddress;
   Assembly *asmObj;
+  BOOL branchAlways;
 
 
   progCounter = start;
@@ -321,23 +323,61 @@ enum {
 
     {
       Assembly *asmObj;
-      CLNumber *anAddress, *nearest;
+      CLNumber *anAddress, *nearest, *replace;
+      CLUInteger a1, a2;
 
 
       anAddress = [CLNumber numberWithUnsignedInt:progCounter];
       nearest = [self assemblyWithAddress:anAddress length:oc->length];
       asmObj = [assembly objectForKey:nearest];
-      if ([nearest compare:anAddress]) {
-	len = [anAddress unsignedIntValue] - [nearest unsignedIntValue];
+      while ([nearest compare:anAddress]) {
+	if ([nearest compare:anAddress] > 0) {
+	  a1 = [nearest unsignedIntValue] + [asmObj length];
+	  a2 = progCounter + oc->length;
+	  if (a2 > a1)
+	    len = 0;
+	  else
+	    len = a1 - a2;
+	  replace = [CLNumber numberWithUnsignedInt:progCounter + oc->length];
+	}
+	else {
+	  len = [anAddress unsignedIntValue] - [nearest unsignedIntValue];
+	  replace = nearest;
+	}
 	[assembly removeObjectForKey:nearest];
-	[self declareBytes:len at:[nearest unsignedIntValue] forced:NO];
-	asmObj = nil;
+	if (len)
+	  [self declareBytes:len at:[replace unsignedIntValue] forced:NO];
+
+	if ((nearest = [self assemblyWithAddress:anAddress length:oc->length]))
+	  asmObj = [assembly objectForKey:nearest];
+	else
+	  asmObj = nil;
       }
       if (!asmObj)
 	[self addAssembly:oc->mnem value:val length:oc->length
 	       entryPoint:progCounter == start at:progCounter type:oc->type forced:NO];
     }
 
+    branchAlways = NO;
+    if (oc->type & OpcodeBranch) {
+      Assembly *prev;
+      CLNumber *anAddress, *nearest;
+
+
+      anAddress = [CLNumber numberWithUnsignedInt:progCounter - 1];
+      nearest = [self assemblyWithAddress:anAddress length:1];
+      if (nearest) {
+	prev = [assembly objectForKey:nearest];
+	if (([[prev line] isEqualToString:@"CLC"]
+	     && [oc->mnem isEqualToString:@"BCC %@"])
+	    || ([[prev line] isEqualToString:@"SEC"]
+		&& [oc->mnem isEqualToString:@"BCS %@"])
+	    || ([[prev line] isEqualToString:@"CLV"]
+		&& [oc->mnem isEqualToString:@"BVC %@"]))
+	  branchAlways = YES;
+      }
+    }
+    
     progCounter += oc->length;
     
     if (oc->type & OpcodeBranch || oc->type & OpcodeCall) {
@@ -360,7 +400,8 @@ enum {
 	[self pushStack:val];
       return;
     }
-    else if (oc->type & OpcodeReturn)
+    else if (oc->type & OpcodeReturn || branchAlways ||
+	     progCounter == [binary length] + origin)
       return;
   }
 
@@ -727,24 +768,105 @@ enum {
     }
     printf("\n");
   }
-  
-  anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
-  for (i = 0, j = [anArray count]; i < j; i++) {
-    num = [anArray objectAtIndex:i];
-    asmObj = [assembly objectForKey:num];
-    if (i && [asmObj isEntryPoint])
-      printf("\n");
-    label = [labels objectForKey:num];
+
+  {
+    CLMutableArray *output, *line;
+    CLString *aString;
+    int col[4];
+    int k, len;
+
+
+    output = [[CLMutableArray alloc] init];
+    anArray = [[assembly allKeys] sortedArrayUsingSelector:@selector(compare:)];
+    for (i = 0, j = [anArray count]; i < j; i++) {
+      line = [[CLMutableArray alloc] init];
+      num = [anArray objectAtIndex:i];
+      asmObj = [assembly objectForKey:num];
+      if (i && [asmObj isEntryPoint])
+	[output addObject:CLNullObject];
+      label = [labels objectForKey:num];
 #if 0
-    if (label && ![refCount objectForKey:label] && ![subs objectForKey:num])
-      label = nil;
+      if (label && ![refCount objectForKey:label] && ![subs objectForKey:num])
+	label = nil;
 #endif
-    label = [label stringByAppendingString:@":"];
-    printf("%s\t%s", label ? [label UTF8String] : "",
-	   [[asmObj lineWithLabel:labels disassembler:self] UTF8String]);
-    if (label && hashedLabels)
-      printf("\t; $%04X", [[anArray objectAtIndex:i] unsignedIntValue]);
-    printf("\n");
+      label = [label stringByAppendingString:@":"];
+      if (!label)
+	label = CLNullObject;
+      [line addObject:label];
+
+      aString = [asmObj lineWithLabel:labels disassembler:self];
+      if ([asmObj type] & OpcodeBranch) {
+	CLUInteger a1, a2;
+	CLInteger v;
+
+
+	a1 = [num unsignedIntValue];
+	a2 = [asmObj value];
+	v = a2 - a1;
+	aString = [aString stringByAppendingFormat:@"  ; (%s%i)", v > 0 ? "+" : "", v];
+      }
+      if ([asmObj type] & OpcodeJump || [asmObj type] & OpcodeCall)
+	aString = [aString stringByAppendingFormat:@"  ; ($%04X)", [asmObj value]];
+      [line addObject:aString];
+      
+      if (label && hashedLabels)
+	[line addObject:[CLString stringWithFormat:@"; $%04X",
+			   [[anArray objectAtIndex:i] unsignedIntValue]]];
+      else
+	[line addObject:CLNullObject];
+      if (!hashedLabels)
+	[line addObject:[CLString stringWithFormat:@"\t; $%04X", [num unsignedIntValue]]];
+
+      [output addObject:line];
+      [line release];
+    }
+
+    memset(col, 0, sizeof(col));
+    for (i = 0, j = [output count]; i < j; i++) {
+      line = [output objectAtIndex:i];
+      if (line == CLNullObject)
+	continue;
+      for (k = 0; k < 3; k++) {
+	aString = [line objectAtIndex:k];
+	if (aString != CLNullObject) {
+	  len = ((strlen([aString UTF8String]) + 8) / 8) * 8;
+	  if (len > col[k])
+	    col[k] = len;
+	}
+      }
+    }
+
+    for (i = 0, j = [output count]; i < j; i++) {
+      line = [output objectAtIndex:i];
+      if (line == CLNullObject) {
+	printf("\n");
+	continue;
+      }
+      
+      for (k = len = 0; k < 3; k++) {
+	for (; len; len--)
+	  printf("\t");
+
+	aString = [line objectAtIndex:k];
+	len = 0;
+	if (aString != CLNullObject) {
+	  len = [aString length];
+	  printf("%s", [aString UTF8String]);
+	}
+	len = (col[k] + 7 - len) / 8;
+      }
+
+      aString = [line objectAtIndex:k];
+      if (aString != CLNullObject) {
+	for (; len; len--)
+	  printf("\t");
+	printf("%s", [aString UTF8String]);
+      }
+
+      printf("\n");
+    }
+    
+    [output release];
   }
   
   return;
